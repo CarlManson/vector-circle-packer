@@ -11,10 +11,84 @@ const statusEl = document.getElementById('status');
 let imageWidth = 0;
 let imageHeight = 0;
 
-const TARGET_WIDTH = 500;
+const TARGET_WIDTH = 1000;
+
+// --- Persistence ---
+const SETTINGS_KEY = 'circlePackerSettings';
+const IMAGE_KEY = 'circlePackerImage';
+
+function saveSetting(key, value) {
+    try {
+        const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        s[key] = value;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    } catch(e) {}
+}
+
+function saveImage() {
+    try {
+        localStorage.setItem(IMAGE_KEY, hiddenCanvas.toDataURL('image/jpeg', 0.85));
+    } catch(e) {}
+}
+
+function restoreImage() {
+    try {
+        const dataUrl = localStorage.getItem(IMAGE_KEY);
+        if (!dataUrl) return;
+        const img = new Image();
+        img.onload = function() {
+            imageWidth = img.width;
+            imageHeight = img.height;
+            hiddenCanvas.width = imageWidth;
+            hiddenCanvas.height = imageHeight;
+            ctx.drawImage(img, 0, 0);
+            outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
+            outputSvg.setAttribute('width', imageWidth);
+            outputSvg.setAttribute('height', imageHeight);
+            statusEl.textContent = `Image restored: ${imageWidth}×${imageHeight}px`;
+            downloadBtn.disabled = true;
+            renderThresholdPreview();
+        };
+        img.src = dataUrl;
+    } catch(e) {}
+}
+
+function loadSettings() {
+    try {
+        const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        if (s.threshold !== undefined) { thresholdInput.value = s.threshold; thresholdVal.textContent = s.threshold; }
+        if (s.minRadius !== undefined) document.getElementById('minRadius').value = s.minRadius;
+        if (s.maxRadius !== undefined) document.getElementById('maxRadius').value = s.maxRadius;
+        if (s.colorMode !== undefined) {
+            const radio = document.querySelector(`input[name="colorMode"][value="${s.colorMode}"]`);
+            if (radio) radio.checked = true;
+        }
+        if (s.circleColor !== undefined) document.getElementById('circleColor').value = s.circleColor;
+    } catch(e) {}
+    updateColorPickerVisibility();
+}
+
+function updateColorPickerVisibility() {
+    const mode = document.querySelector('input[name="colorMode"]:checked')?.value;
+    document.getElementById('colorPickerWrap').style.display = mode === 'solid' ? 'block' : 'none';
+}
+
+document.querySelectorAll('input[name="colorMode"]').forEach(r => {
+    r.addEventListener('change', () => {
+        saveSetting('colorMode', r.value);
+        updateColorPickerVisibility();
+    });
+});
+document.getElementById('circleColor').addEventListener('input', e => saveSetting('circleColor', e.target.value));
+document.getElementById('minRadius').addEventListener('change', e => saveSetting('minRadius', e.target.value));
+document.getElementById('maxRadius').addEventListener('change', e => saveSetting('maxRadius', e.target.value));
+
+loadSettings();
+restoreImage();
 
 thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
+    saveSetting('threshold', thresholdInput.value);
     if (imageWidth > 0) renderThresholdPreview();
 });
 
@@ -31,6 +105,7 @@ imageUpload.addEventListener('change', function(e) {
             hiddenCanvas.width = imageWidth;
             hiddenCanvas.height = imageHeight;
             ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
+            saveImage();
 
             outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
             outputSvg.setAttribute('width', imageWidth);
@@ -212,6 +287,50 @@ class MaxHeap {
     }
 }
 
+function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+function sampleCircleColor(data, W, H, cx, cy, r) {
+    const r2 = r * r;
+    const x0 = Math.max(0, Math.ceil(cx - r));
+    const x1 = Math.min(W - 1, Math.floor(cx + r));
+    const y0 = Math.max(0, Math.ceil(cy - r));
+    const y1 = Math.min(H - 1, Math.floor(cy + r));
+    let rS = 0, gS = 0, bS = 0, n = 0;
+    for (let py = y0; py <= y1; py++) {
+        for (let px = x0; px <= x1; px++) {
+            const dx = px - cx, dy = py - cy;
+            if (dx * dx + dy * dy <= r2) {
+                const si = (py * W + px) * 4;
+                rS += data[si]; gS += data[si + 1]; bS += data[si + 2]; n++;
+            }
+        }
+    }
+    return n === 0 ? '#000000' : rgbToHex(Math.round(rS / n), Math.round(gS / n), Math.round(bS / n));
+}
+
+function sampleGlobalColor(data, W, H, placed) {
+    let rS = 0, gS = 0, bS = 0, n = 0;
+    for (const { x, y, r } of placed) {
+        const r2 = r * r;
+        const x0 = Math.max(0, Math.ceil(x - r));
+        const x1 = Math.min(W - 1, Math.floor(x + r));
+        const y0 = Math.max(0, Math.ceil(y - r));
+        const y1 = Math.min(H - 1, Math.floor(y + r));
+        for (let py = y0; py <= y1; py++) {
+            for (let px = x0; px <= x1; px++) {
+                const dx = px - x, dy = py - y;
+                if (dx * dx + dy * dy <= r2) {
+                    const si = (py * W + px) * 4;
+                    rS += data[si]; gS += data[si + 1]; bS += data[si + 2]; n++;
+                }
+            }
+        }
+    }
+    return n === 0 ? '#000000' : rgbToHex(Math.round(rS / n), Math.round(gS / n), Math.round(bS / n));
+}
+
 function packCircles() {
     const minR = Math.max(1, parseInt(document.getElementById('minRadius').value, 10));
     const maxR = Math.max(minR, parseInt(document.getElementById('maxRadius').value, 10));
@@ -249,9 +368,9 @@ function packCircles() {
         const { idx, r: heapR } = heap.pop();
 
         // The heap may contain stale entries — skip if liveDist has since decreased
-        const currentR = Math.floor(liveDist[idx]);
+        const currentR = liveDist[idx];
         if (currentR < minR) continue;
-        if (currentR < Math.floor(heapR) - 0.5) {
+        if (currentR < heapR - 0.5) {
             // Stale — re-insert with updated value if still viable
             if (currentR >= minR) heap.push({ idx, r: currentR });
             continue;
@@ -294,6 +413,17 @@ function packCircles() {
         }
     }
 
+    // Determine colours
+    const colorMode = document.querySelector('input[name="colorMode"]:checked')?.value || 'solid';
+    const imageData = ctx.getImageData(0, 0, W, H);
+    const imgPixels = imageData.data;
+
+    let globalColor;
+    if (colorMode === 'global') {
+        statusEl.textContent = "Computing global colour...";
+        globalColor = sampleGlobalColor(imgPixels, W, H, placed);
+    }
+
     // Render SVG
     outputSvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     outputSvg.setAttribute('width', W);
@@ -307,12 +437,18 @@ function packCircles() {
     bg.setAttribute('fill', 'white');
     fragment.appendChild(bg);
 
+    const solidColor = document.getElementById('circleColor').value;
+
     for (const c of placed) {
         const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
         circle.setAttribute('cx', c.x);
         circle.setAttribute('cy', c.y);
         circle.setAttribute('r', c.r);
-        circle.setAttribute('fill', 'black');
+        let fill;
+        if (colorMode === 'per-circle') fill = sampleCircleColor(imgPixels, W, H, c.x, c.y, c.r);
+        else if (colorMode === 'global') fill = globalColor;
+        else fill = solidColor;
+        circle.setAttribute('fill', fill);
         fragment.appendChild(circle);
     }
 
