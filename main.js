@@ -105,9 +105,11 @@ function rgbToHue(r, g, b) {
 
 function updateModeUI() {
     const mode = getZoneMode();
-    document.getElementById('modeBrightness').classList.toggle('active', mode === 'brightness');
-    document.getElementById('modeHue').classList.toggle('active', mode === 'hue');
-    document.getElementById('hueStartRow').style.display      = mode === 'hue' ? 'block' : 'none';
+    const btnB = document.getElementById('modeBrightness');
+    const btnH = document.getElementById('modeHue');
+    btnB.className = `btn btn-sm ${mode === 'brightness' ? 'btn-primary' : 'btn-outline-primary'}`;
+    btnH.className = `btn btn-sm ${mode === 'hue'        ? 'btn-primary' : 'btn-outline-primary'}`;
+    document.getElementById('hueStartRow').style.display        = mode === 'hue' ? 'block' : 'none';
     document.getElementById('blackZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
     document.getElementById('whiteZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
 }
@@ -128,21 +130,30 @@ function saveZoneSetting(z, key, value) {
 
 function zoneControlsHTML(zKey, s) {
     return `
-        <div class="zone-row">
-            <span>Min R</span>
-            <input type="number" class="zone-minR" value="${s.minR}" min="1" max="500">
+        <div class="compact-row">
+            <label>Min R</label>
+            <input type="number" class="form-control form-control-sm zone-minR" value="${s.minR}" min="1" max="500">
         </div>
-        <div class="zone-row">
-            <span>Max R</span>
-            <input type="number" class="zone-maxR" value="${s.maxR}" min="1" max="500">
+        <div class="compact-row">
+            <label>Max R</label>
+            <input type="number" class="form-control form-control-sm zone-maxR" value="${s.maxR}" min="1" max="500">
         </div>
-        <div class="radio-group" style="margin-top:8px;">
-            <label><input type="radio" name="z${zKey}_cm" value="solid"      ${s.colorMode==='solid'?'checked':''}> Solid colour</label>
-            <label><input type="radio" name="z${zKey}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}> Average per circle</label>
-            <label><input type="radio" name="z${zKey}_cm" value="global"     ${s.colorMode==='global'?'checked':''}> Global average</label>
+        <div class="mt-2">
+            <div class="form-check form-check-sm py-0">
+                <input class="form-check-input" type="radio" name="z${zKey}_cm" value="solid" ${s.colorMode==='solid'?'checked':''}>
+                <label class="form-check-label small">Solid colour</label>
+            </div>
+            <div class="form-check form-check-sm py-0">
+                <input class="form-check-input" type="radio" name="z${zKey}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}>
+                <label class="form-check-label small">Average per circle</label>
+            </div>
+            <div class="form-check form-check-sm py-0">
+                <input class="form-check-input" type="radio" name="z${zKey}_cm" value="global" ${s.colorMode==='global'?'checked':''}>
+                <label class="form-check-label small">Global average</label>
+            </div>
         </div>
-        <div class="zone-color-wrap" style="margin-top:6px;${s.colorMode!=='solid'?'display:none':''}">
-            <input type="color" class="zone-color" value="${s.solidColor}">
+        <div class="zone-color-wrap mt-2" ${s.colorMode!=='solid'?'style="display:none"':''}>
+            <input type="color" class="form-control form-control-color w-100 zone-color" value="${s.solidColor}">
         </div>`;
 }
 
@@ -164,54 +175,54 @@ function wireZoneControls(panel, zKey) {
 
 function buildZonePanelEl(zKey, label, swatchColor, rangeText, s) {
     const panel = document.createElement('div');
-    panel.className = 'zone-panel';
+    panel.className = 'card zone-card';
     panel.dataset.zone = zKey;
     panel.innerHTML = `
-        <div class="zone-header">
+        <div class="card-header">
             <span class="zone-swatch" style="background:${swatchColor}"></span>
             ${label}
             <span class="zone-range">${rangeText}</span>
         </div>
-        <div class="zone-body">${zoneControlsHTML(zKey, s)}</div>`;
+        <div class="card-body">${zoneControlsHTML(zKey, s)}</div>`;
     wireZoneControls(panel, zKey);
     return panel;
 }
 
 function buildNeutralZonePanel(key) {
-    // key = 'black' | 'white'
-    const isBlack    = key === 'black';
-    const enabled    = isBlack ? blackZoneEnabled : whiteZoneEnabled;
-    const thresh     = isBlack ? blackThreshold : whiteThreshold;
-    const threshold  = parseInt(thresholdInput.value, 10);
-    const rangeText  = isBlack ? `L: 0–${thresh}` : `L: ${thresh}–${threshold}`;
-    const swatchBg   = isBlack ? '#111' : '#eee';
-    const label      = isBlack ? 'Black zone' : 'White zone';
-    const sliderMin  = isBlack ? 1   : 128;
-    const sliderMax  = isBlack ? 128 : 254;
-    const s          = getZoneSettings(key);
+    const isBlack   = key === 'black';
+    const enabled   = isBlack ? blackZoneEnabled : whiteZoneEnabled;
+    const thresh    = isBlack ? blackThreshold : whiteThreshold;
+    const threshold = parseInt(thresholdInput.value, 10);
+    const rangeText = isBlack ? `L: 0–${thresh}` : `L: ${thresh}–${threshold}`;
+    const swatchBg  = isBlack ? '#111' : '#eee';
+    const label     = isBlack ? 'Black zone' : 'White zone';
+    const sliderMin = isBlack ? 1   : 128;
+    const sliderMax = isBlack ? 128 : 254;
+    const s         = getZoneSettings(key);
 
     const panel = document.createElement('div');
-    panel.className = 'zone-panel';
+    panel.className = 'card zone-card';
     panel.dataset.zone = key;
     panel.innerHTML = `
-        <div class="zone-header" style="cursor:pointer;gap:6px;">
-            <input type="checkbox" style="margin:0;cursor:pointer;" ${enabled ? 'checked' : ''}>
-            <span class="zone-swatch" style="background:${swatchBg};border-color:#aaa;"></span>
+        <div class="card-header" style="cursor:pointer;">
+            <div class="form-check form-check-inline m-0 me-1">
+                <input class="form-check-input" type="checkbox" ${enabled ? 'checked' : ''}>
+            </div>
+            <span class="zone-swatch" style="background:${swatchBg};border-color:#999;"></span>
             ${label}
             <span class="zone-range neutral-range">${rangeText}</span>
         </div>
-        <div class="zone-body" ${enabled ? '' : 'style="display:none"'}>
-            <div class="adj-row" style="margin-top:4px;">
-                <span>${isBlack ? 'Max L' : 'Min L'}</span>
-                <input type="range" class="neutral-thresh" min="${sliderMin}" max="${sliderMax}" value="${thresh}">
-                <span class="adj-val neutral-thresh-val">${thresh}</span>
+        <div class="card-body" ${enabled ? '' : 'style="display:none"'}>
+            <div class="neutral-thresh-row">
+                <label>${isBlack ? 'Max L' : 'Min L'}</label>
+                <input type="range" class="form-range neutral-thresh" min="${sliderMin}" max="${sliderMax}" value="${thresh}">
+                <span class="val neutral-thresh-val">${thresh}</span>
             </div>
             ${zoneControlsHTML(key, s)}
         </div>`;
 
-    // Toggle enabled
     const checkbox  = panel.querySelector('input[type="checkbox"]');
-    const body      = panel.querySelector('.zone-body');
+    const body      = panel.querySelector('.card-body');
     const rangeEl   = panel.querySelector('.neutral-range');
     checkbox.addEventListener('change', () => {
         if (isBlack) { blackZoneEnabled = checkbox.checked; saveSetting('blackZoneEnabled', blackZoneEnabled); }
@@ -220,7 +231,6 @@ function buildNeutralZonePanel(key) {
         if (imageWidth > 0) renderThresholdPreview();
     });
 
-    // Threshold slider
     const threshEl    = panel.querySelector('.neutral-thresh');
     const threshValEl = panel.querySelector('.neutral-thresh-val');
     threshEl.addEventListener('input', () => {
@@ -283,7 +293,7 @@ function renderBgZonePanel() {
 }
 
 function getZoneSettingsFromDOM(zKey) {
-    const panel = document.querySelector(`.zone-panel[data-zone="${zKey}"]`);
+    const panel = document.querySelector(`[data-zone="${zKey}"]`);
     if (!panel) return getZoneSettings(zKey);
     return {
         minR:      Math.max(1, parseInt(panel.querySelector('.zone-minR').value, 10) || 2),
