@@ -61,10 +61,22 @@ function restoreImage() {
 }
 
 // --- Zone mode helpers (in-memory, localStorage is persistence only) ---
-let zoneMode = getSetting('zoneMode', 'brightness');
-let hueStart = parseFloat(getSetting('hueStart', 0));
-function getZoneMode() { return zoneMode; }
-function getHueStart() { return hueStart; }
+let zoneMode       = getSetting('zoneMode', 'brightness');
+let hueStart       = parseFloat(getSetting('hueStart', 0));
+let blackZoneEnabled = getSetting('blackZoneEnabled', false);
+let blackThreshold   = parseInt(getSetting('blackThreshold', 20));
+let whiteZoneEnabled = getSetting('whiteZoneEnabled', false);
+let whiteThreshold   = parseInt(getSetting('whiteThreshold', 235));
+function getZoneMode()  { return zoneMode; }
+function getHueStart()  { return hueStart; }
+// Effective luminance range for hue zones (shrinks when black/white zones active)
+function getHueLumRange() {
+    const threshold = parseInt(thresholdInput.value, 10);
+    return {
+        lo: blackZoneEnabled ? blackThreshold : 0,
+        hi: whiteZoneEnabled ? whiteThreshold : threshold,
+    };
+}
 
 function getZoneBounds(z, n, threshold) {
     const lo = Math.round(z * threshold / n);
@@ -95,7 +107,9 @@ function updateModeUI() {
     const mode = getZoneMode();
     document.getElementById('modeBrightness').classList.toggle('active', mode === 'brightness');
     document.getElementById('modeHue').classList.toggle('active', mode === 'hue');
-    document.getElementById('hueStartRow').style.display = mode === 'hue' ? 'block' : 'none';
+    document.getElementById('hueStartRow').style.display      = mode === 'hue' ? 'block' : 'none';
+    document.getElementById('blackZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
+    document.getElementById('whiteZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
 }
 
 // --- Zone settings ---
@@ -112,35 +126,27 @@ function saveZoneSetting(z, key, value) {
     saveSetting(`zone_${z}_${key}`, value);
 }
 
-function buildZonePanelEl(zKey, label, swatchColor, rangeText, s) {
-    const panel = document.createElement('div');
-    panel.className = 'zone-panel';
-    panel.dataset.zone = zKey;
-    panel.innerHTML = `
-        <div class="zone-header">
-            <span class="zone-swatch" style="background:${swatchColor}"></span>
-            ${label}
-            <span class="zone-range">${rangeText}</span>
+function zoneControlsHTML(zKey, s) {
+    return `
+        <div class="zone-row">
+            <span>Min R</span>
+            <input type="number" class="zone-minR" value="${s.minR}" min="1" max="500">
         </div>
-        <div class="zone-body">
-            <div class="zone-row">
-                <span>Min R</span>
-                <input type="number" class="zone-minR" value="${s.minR}" min="1" max="500">
-            </div>
-            <div class="zone-row">
-                <span>Max R</span>
-                <input type="number" class="zone-maxR" value="${s.maxR}" min="1" max="500">
-            </div>
-            <div class="radio-group" style="margin-top:8px;">
-                <label><input type="radio" name="z${zKey}_cm" value="solid"      ${s.colorMode==='solid'?'checked':''}> Solid colour</label>
-                <label><input type="radio" name="z${zKey}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}> Average per circle</label>
-                <label><input type="radio" name="z${zKey}_cm" value="global"     ${s.colorMode==='global'?'checked':''}> Global average</label>
-            </div>
-            <div class="zone-color-wrap" style="margin-top:6px;${s.colorMode!=='solid'?'display:none':''}">
-                <input type="color" class="zone-color" value="${s.solidColor}">
-            </div>
+        <div class="zone-row">
+            <span>Max R</span>
+            <input type="number" class="zone-maxR" value="${s.maxR}" min="1" max="500">
+        </div>
+        <div class="radio-group" style="margin-top:8px;">
+            <label><input type="radio" name="z${zKey}_cm" value="solid"      ${s.colorMode==='solid'?'checked':''}> Solid colour</label>
+            <label><input type="radio" name="z${zKey}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}> Average per circle</label>
+            <label><input type="radio" name="z${zKey}_cm" value="global"     ${s.colorMode==='global'?'checked':''}> Global average</label>
+        </div>
+        <div class="zone-color-wrap" style="margin-top:6px;${s.colorMode!=='solid'?'display:none':''}">
+            <input type="color" class="zone-color" value="${s.solidColor}">
         </div>`;
+}
 
+function wireZoneControls(panel, zKey) {
     const minREl    = panel.querySelector('.zone-minR');
     const maxREl    = panel.querySelector('.zone-maxR');
     const colorEl   = panel.querySelector('.zone-color');
@@ -154,6 +160,78 @@ function buildZonePanelEl(zKey, label, swatchColor, rangeText, s) {
             colorWrap.style.display = r.value === 'solid' ? 'block' : 'none';
         });
     });
+}
+
+function buildZonePanelEl(zKey, label, swatchColor, rangeText, s) {
+    const panel = document.createElement('div');
+    panel.className = 'zone-panel';
+    panel.dataset.zone = zKey;
+    panel.innerHTML = `
+        <div class="zone-header">
+            <span class="zone-swatch" style="background:${swatchColor}"></span>
+            ${label}
+            <span class="zone-range">${rangeText}</span>
+        </div>
+        <div class="zone-body">${zoneControlsHTML(zKey, s)}</div>`;
+    wireZoneControls(panel, zKey);
+    return panel;
+}
+
+function buildNeutralZonePanel(key) {
+    // key = 'black' | 'white'
+    const isBlack    = key === 'black';
+    const enabled    = isBlack ? blackZoneEnabled : whiteZoneEnabled;
+    const thresh     = isBlack ? blackThreshold : whiteThreshold;
+    const threshold  = parseInt(thresholdInput.value, 10);
+    const rangeText  = isBlack ? `L: 0–${thresh}` : `L: ${thresh}–${threshold}`;
+    const swatchBg   = isBlack ? '#111' : '#eee';
+    const label      = isBlack ? 'Black zone' : 'White zone';
+    const sliderMin  = isBlack ? 1   : 128;
+    const sliderMax  = isBlack ? 128 : 254;
+    const s          = getZoneSettings(key);
+
+    const panel = document.createElement('div');
+    panel.className = 'zone-panel';
+    panel.dataset.zone = key;
+    panel.innerHTML = `
+        <div class="zone-header" style="cursor:pointer;gap:6px;">
+            <input type="checkbox" style="margin:0;cursor:pointer;" ${enabled ? 'checked' : ''}>
+            <span class="zone-swatch" style="background:${swatchBg};border-color:#aaa;"></span>
+            ${label}
+            <span class="zone-range neutral-range">${rangeText}</span>
+        </div>
+        <div class="zone-body" ${enabled ? '' : 'style="display:none"'}>
+            <div class="adj-row" style="margin-top:4px;">
+                <span>${isBlack ? 'Max L' : 'Min L'}</span>
+                <input type="range" class="neutral-thresh" min="${sliderMin}" max="${sliderMax}" value="${thresh}">
+                <span class="adj-val neutral-thresh-val">${thresh}</span>
+            </div>
+            ${zoneControlsHTML(key, s)}
+        </div>`;
+
+    // Toggle enabled
+    const checkbox  = panel.querySelector('input[type="checkbox"]');
+    const body      = panel.querySelector('.zone-body');
+    const rangeEl   = panel.querySelector('.neutral-range');
+    checkbox.addEventListener('change', () => {
+        if (isBlack) { blackZoneEnabled = checkbox.checked; saveSetting('blackZoneEnabled', blackZoneEnabled); }
+        else         { whiteZoneEnabled = checkbox.checked; saveSetting('whiteZoneEnabled', whiteZoneEnabled); }
+        body.style.display = checkbox.checked ? 'block' : 'none';
+        if (imageWidth > 0) renderThresholdPreview();
+    });
+
+    // Threshold slider
+    const threshEl    = panel.querySelector('.neutral-thresh');
+    const threshValEl = panel.querySelector('.neutral-thresh-val');
+    threshEl.addEventListener('input', () => {
+        const v = parseInt(threshEl.value, 10);
+        if (isBlack) { blackThreshold = v; saveSetting('blackThreshold', v); rangeEl.textContent = `L: 0–${v}`; }
+        else         { whiteThreshold = v; saveSetting('whiteThreshold', v); rangeEl.textContent = `L: ${v}–${threshold}`; }
+        threshValEl.textContent = v;
+        if (imageWidth > 0) renderThresholdPreview();
+    });
+
+    wireZoneControls(panel, key);
     return panel;
 }
 
@@ -179,6 +257,17 @@ function renderZonePanels() {
         }
         container.appendChild(buildZonePanelEl(z, `Zone ${z + 1}`, swatchColor, rangeText, getZoneSettings(z)));
     }
+
+    // Neutral zones (hue mode only)
+    const blackContainer = document.getElementById('blackZoneContainer');
+    const whiteContainer = document.getElementById('whiteZoneContainer');
+    blackContainer.innerHTML = '';
+    whiteContainer.innerHTML = '';
+    if (mode === 'hue') {
+        blackContainer.appendChild(buildNeutralZonePanel('black'));
+        whiteContainer.appendChild(buildNeutralZonePanel('white'));
+    }
+
     renderBgZonePanel();
 }
 
@@ -211,8 +300,12 @@ function loadSettings() {
         if (s.threshold !== undefined) { thresholdInput.value = s.threshold; thresholdVal.textContent = s.threshold; }
         if (s.numZones !== undefined) document.getElementById('numZones').value = s.numZones;
         if (s.bgZoneEnabled !== undefined) document.getElementById('bgZoneEnabled').checked = s.bgZoneEnabled;
-        if (s.zoneMode !== undefined) zoneMode = s.zoneMode;
-        if (s.hueStart !== undefined) { hueStart = parseFloat(s.hueStart); document.getElementById('hueStart').value = s.hueStart; document.getElementById('hueStartVal').textContent = Math.round(s.hueStart) + '°'; }
+        if (s.zoneMode      !== undefined) zoneMode      = s.zoneMode;
+        if (s.hueStart      !== undefined) { hueStart = parseFloat(s.hueStart); document.getElementById('hueStart').value = s.hueStart; document.getElementById('hueStartVal').textContent = Math.round(s.hueStart) + '°'; }
+        if (s.blackZoneEnabled !== undefined) blackZoneEnabled = s.blackZoneEnabled;
+        if (s.blackThreshold   !== undefined) blackThreshold   = parseInt(s.blackThreshold);
+        if (s.whiteZoneEnabled !== undefined) whiteZoneEnabled = s.whiteZoneEnabled;
+        if (s.whiteThreshold   !== undefined) whiteThreshold   = parseInt(s.whiteThreshold);
         [
             { id: 'brightness', label: 'brightnessVal', decimals: 0 },
             { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
@@ -374,18 +467,25 @@ function renderThresholdPreview() {
                 pr = pg = pb = 255;
             }
         } else if (mode === 'hue') {
-            const hue = rgbToHue(r, g, b);
-            // find which zone this hue belongs to
-            let zoneIdx = 0;
-            for (let z = 0; z < n; z++) {
-                const { lo, hi } = getZoneHueBounds(z, n, offset);
-                const wraps = hi <= lo;
-                if (wraps ? (hue >= lo || hue < hi) : (hue >= lo && hue < hi)) { zoneIdx = z; break; }
+            const { lo: lumLo, hi: lumHi } = getHueLumRange();
+            if (blackZoneEnabled && lum < blackThreshold) {
+                pr = pg = pb = 20; // dark swatch for black zone
+            } else if (whiteZoneEnabled && lum >= whiteThreshold) {
+                pr = pg = pb = 235; // light swatch for white zone
+            } else if (lum >= lumLo && lum < lumHi) {
+                const hue = rgbToHue(r, g, b);
+                let zoneIdx = 0;
+                for (let z = 0; z < n; z++) {
+                    const { lo, hi } = getZoneHueBounds(z, n, offset);
+                    const wraps = hi <= lo;
+                    if (wraps ? (hue >= lo || hue < hi) : (hue >= lo && hue < hi)) { zoneIdx = z; break; }
+                }
+                const midHue = (offset + (zoneIdx + 0.5) * 360 / n) % 360;
+                const [hr, hg, hb] = hslToRgb(midHue, 0.8, 0.5);
+                pr = hr; pg = hg; pb = hb;
+            } else {
+                pr = pg = pb = 255; // gap pixels → white
             }
-            const midHue = (offset + (zoneIdx + 0.5) * 360 / n) % 360;
-            // Convert hsl to rgb for preview
-            const [hr, hg, hb] = hslToRgb(midHue, 0.8, 0.5);
-            pr = hr; pg = hg; pb = hb;
         } else {
             const z = Math.min(n - 1, Math.floor(lum * n / threshold));
             const { lo, hi } = getZoneBounds(z, n, threshold);
@@ -446,7 +546,7 @@ function buildZoneBinaryMap(adjustedData, lo, hi) {
     return binaryMap;
 }
 
-function buildHueZoneBinaryMap(adjustedData, lo, hi, threshold) {
+function buildHueZoneBinaryMap(adjustedData, lo, hi, lumLo, lumHi) {
     const total = imageWidth * imageHeight;
     const binaryMap = new Uint8Array(total);
     const wraps = hi <= lo; // hue range wraps around 360°
@@ -454,7 +554,7 @@ function buildHueZoneBinaryMap(adjustedData, lo, hi, threshold) {
         const si = i * 4;
         const r = adjustedData[si], g = adjustedData[si+1], b = adjustedData[si+2];
         const lum = r * 0.299 + g * 0.587 + b * 0.114;
-        if (lum >= threshold) continue;
+        if (lum < lumLo || lum >= lumHi) continue;
         const hue = rgbToHue(r, g, b);
         const inZone = wraps ? (hue >= lo || hue < hi) : (hue >= lo && hue < hi);
         if (inZone) binaryMap[i] = 1;
@@ -640,8 +740,9 @@ function packCircles() {
         statusEl.textContent = `Zone ${z+1}/${n}: binary map...`;
         let binaryMap;
         if (mode === 'hue') {
+            const { lo: lumLo, hi: lumHi } = getHueLumRange();
             const { lo, hi } = getZoneHueBounds(z, n, offset);
-            binaryMap = buildHueZoneBinaryMap(adjustedData, lo, hi, threshold);
+            binaryMap = buildHueZoneBinaryMap(adjustedData, lo, hi, lumLo, lumHi);
         } else {
             const { lo, hi } = getZoneBounds(z, n, threshold);
             binaryMap = buildZoneBinaryMap(adjustedData, lo, hi);
@@ -670,6 +771,33 @@ function packCircles() {
             else fill = zs.solidColor;
             circle.setAttribute('fill', fill);
             fragment.appendChild(circle);
+        }
+    }
+
+    // Optional black / white zones (hue mode only)
+    if (mode === 'hue') {
+        for (const key of ['black', 'white']) {
+            const isBlack  = key === 'black';
+            const enabled  = isBlack ? blackZoneEnabled : whiteZoneEnabled;
+            if (!enabled) continue;
+            const zs   = getZoneSettingsFromDOM(key);
+            const minR = Math.max(1, zs.minR), maxR = Math.max(minR, zs.maxR);
+            const lo   = isBlack ? 0 : whiteThreshold;
+            const hi   = isBlack ? blackThreshold : threshold;
+            statusEl.textContent = `${isBlack ? 'Black' : 'White'} zone: packing...`;
+            const bm   = buildZoneBinaryMap(adjustedData, lo, hi);
+            const dm   = buildDistanceMap(bm);
+            const placed = packZone(bm, dm, minR, maxR);
+            totalPlaced += placed.length;
+            const globalColor = zs.colorMode === 'global' ? sampleGlobalColor(imgPixels, W, H, placed) : null;
+            for (const c of placed) {
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', c.x); circle.setAttribute('cy', c.y); circle.setAttribute('r', c.r);
+                const fill = zs.colorMode === 'per-circle' ? sampleCircleColor(imgPixels, W, H, c.x, c.y, c.r)
+                           : zs.colorMode === 'global'     ? globalColor : zs.solidColor;
+                circle.setAttribute('fill', fill);
+                fragment.appendChild(circle);
+            }
         }
     }
 
