@@ -82,73 +82,80 @@ function getZoneBounds(z, n, threshold) {
     return { lo, hi };
 }
 
+function buildZonePanelEl(zKey, label, lo, hi, s) {
+    const midGray = Math.round((lo + hi) / 2);
+    const panel = document.createElement('div');
+    panel.className = 'zone-panel';
+    panel.dataset.zone = zKey;
+    panel.innerHTML = `
+        <div class="zone-header">
+            <span class="zone-swatch" style="background:rgb(${midGray},${midGray},${midGray})"></span>
+            ${label}
+            <span class="zone-range">L: ${lo}–${hi}</span>
+        </div>
+        <div class="zone-body">
+            <div class="zone-row">
+                <span>Min R</span>
+                <input type="number" class="zone-minR" value="${s.minR}" min="1" max="500">
+            </div>
+            <div class="zone-row">
+                <span>Max R</span>
+                <input type="number" class="zone-maxR" value="${s.maxR}" min="1" max="500">
+            </div>
+            <div class="radio-group" style="margin-top:8px;">
+                <label><input type="radio" name="z${zKey}_cm" value="solid"      ${s.colorMode==='solid'?'checked':''}> Solid colour</label>
+                <label><input type="radio" name="z${zKey}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}> Average per circle</label>
+                <label><input type="radio" name="z${zKey}_cm" value="global"     ${s.colorMode==='global'?'checked':''}> Global average</label>
+            </div>
+            <div class="zone-color-wrap" style="margin-top:6px;${s.colorMode!=='solid'?'display:none':''}">
+                <input type="color" class="zone-color" value="${s.solidColor}">
+            </div>
+        </div>`;
+
+    const minREl    = panel.querySelector('.zone-minR');
+    const maxREl    = panel.querySelector('.zone-maxR');
+    const colorEl   = panel.querySelector('.zone-color');
+    const colorWrap = panel.querySelector('.zone-color-wrap');
+    minREl.addEventListener('change', () => saveZoneSetting(zKey, 'minR', minREl.value));
+    maxREl.addEventListener('change', () => saveZoneSetting(zKey, 'maxR', maxREl.value));
+    colorEl.addEventListener('input',  () => saveZoneSetting(zKey, 'solidColor', colorEl.value));
+    panel.querySelectorAll(`input[name="z${zKey}_cm"]`).forEach(r => {
+        r.addEventListener('change', () => {
+            saveZoneSetting(zKey, 'colorMode', r.value);
+            colorWrap.style.display = r.value === 'solid' ? 'block' : 'none';
+        });
+    });
+    return panel;
+}
+
 function renderZonePanels() {
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     const threshold = parseInt(thresholdInput.value, 10);
     const container = document.getElementById('zonesContainer');
     container.innerHTML = '';
-
     for (let z = 0; z < n; z++) {
         const { lo, hi } = getZoneBounds(z, n, threshold);
-        const midGray = Math.round((lo + hi) / 2);
-        const s = getZoneSettings(z);
-
-        const panel = document.createElement('div');
-        panel.className = 'zone-panel';
-        panel.dataset.zone = z;
-
-        panel.innerHTML = `
-            <div class="zone-header">
-                <span class="zone-swatch" style="background:rgb(${midGray},${midGray},${midGray})"></span>
-                Zone ${z + 1}
-                <span class="zone-range">L: ${lo}–${hi}</span>
-            </div>
-            <div class="zone-body">
-                <div class="zone-row">
-                    <span>Min R</span>
-                    <input type="number" class="zone-minR" value="${s.minR}" min="1" max="500">
-                </div>
-                <div class="zone-row">
-                    <span>Max R</span>
-                    <input type="number" class="zone-maxR" value="${s.maxR}" min="1" max="500">
-                </div>
-                <div class="radio-group" style="margin-top:8px;">
-                    <label><input type="radio" name="z${z}_cm" value="solid"      ${s.colorMode==='solid'?'checked':''}> Solid colour</label>
-                    <label><input type="radio" name="z${z}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}> Average per circle</label>
-                    <label><input type="radio" name="z${z}_cm" value="global"     ${s.colorMode==='global'?'checked':''}> Global average</label>
-                </div>
-                <div class="zone-color-wrap" style="margin-top:6px;${s.colorMode!=='solid'?'display:none':''}">
-                    <input type="color" class="zone-color" value="${s.solidColor}">
-                </div>
-            </div>`;
-
-        container.appendChild(panel);
-
-        // Wire events
-        const minREl   = panel.querySelector('.zone-minR');
-        const maxREl   = panel.querySelector('.zone-maxR');
-        const colorEl  = panel.querySelector('.zone-color');
-        const colorWrap= panel.querySelector('.zone-color-wrap');
-
-        minREl.addEventListener('change', () => saveZoneSetting(z, 'minR', minREl.value));
-        maxREl.addEventListener('change', () => saveZoneSetting(z, 'maxR', maxREl.value));
-        colorEl.addEventListener('input',  () => saveZoneSetting(z, 'solidColor', colorEl.value));
-        panel.querySelectorAll(`input[name="z${z}_cm"]`).forEach(r => {
-            r.addEventListener('change', () => {
-                saveZoneSetting(z, 'colorMode', r.value);
-                colorWrap.style.display = r.value === 'solid' ? 'block' : 'none';
-            });
-        });
+        container.appendChild(buildZonePanelEl(z, `Zone ${z + 1}`, lo, hi, getZoneSettings(z)));
     }
+    renderBgZonePanel();
 }
 
-function getZoneSettingsFromDOM(z) {
-    const panel = document.querySelector(`.zone-panel[data-zone="${z}"]`);
-    if (!panel) return getZoneSettings(z);
+function renderBgZonePanel() {
+    const threshold = parseInt(thresholdInput.value, 10);
+    const enabled = document.getElementById('bgZoneEnabled').checked;
+    const container = document.getElementById('bgZoneContainer');
+    container.innerHTML = '';
+    if (!enabled) return;
+    container.appendChild(buildZonePanelEl('bg', 'Background', threshold, 255, getZoneSettings('bg')));
+}
+
+function getZoneSettingsFromDOM(zKey) {
+    const panel = document.querySelector(`.zone-panel[data-zone="${zKey}"]`);
+    if (!panel) return getZoneSettings(zKey);
     return {
         minR:      Math.max(1, parseInt(panel.querySelector('.zone-minR').value, 10) || 2),
         maxR:      parseInt(panel.querySelector('.zone-maxR').value, 10) || 100,
-        colorMode: panel.querySelector(`input[name="z${z}_cm"]:checked`)?.value || 'solid',
+        colorMode: panel.querySelector(`input[name="z${zKey}_cm"]:checked`)?.value || 'solid',
         solidColor:panel.querySelector('.zone-color').value || '#000000',
     };
 }
@@ -159,6 +166,7 @@ function loadSettings() {
         const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
         if (s.threshold !== undefined) { thresholdInput.value = s.threshold; thresholdVal.textContent = s.threshold; }
         if (s.numZones !== undefined) document.getElementById('numZones').value = s.numZones;
+        if (s.bgZoneEnabled !== undefined) document.getElementById('bgZoneEnabled').checked = s.bgZoneEnabled;
         [
             { id: 'brightness', label: 'brightnessVal', decimals: 0 },
             { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
@@ -188,6 +196,12 @@ thresholdInput.addEventListener('input', () => {
 document.getElementById('numZones').addEventListener('change', e => {
     saveSetting('numZones', e.target.value);
     renderZonePanels();
+    if (imageWidth > 0) renderThresholdPreview();
+});
+
+document.getElementById('bgZoneEnabled').addEventListener('change', e => {
+    saveSetting('bgZoneEnabled', e.target.checked);
+    renderBgZonePanel();
     if (imageWidth > 0) renderThresholdPreview();
 });
 
@@ -279,7 +293,8 @@ function renderThresholdPreview() {
         const lum = data[si] * 0.299 + data[si + 1] * 0.587 + data[si + 2] * 0.114;
         let v;
         if (lum >= threshold) {
-            v = 255; // background
+            const bgEnabled = document.getElementById('bgZoneEnabled').checked;
+            v = bgEnabled ? Math.round((threshold + 255) / 2) : 255;
         } else {
             const z = Math.min(n - 1, Math.floor(lum * n / threshold));
             const { lo, hi } = getZoneBounds(z, n, threshold);
@@ -528,13 +543,36 @@ function packCircles() {
         }
     }
 
+    // Optional background zone (luminance >= threshold)
+    if (document.getElementById('bgZoneEnabled').checked) {
+        const zs = getZoneSettingsFromDOM('bg');
+        const minR = Math.max(1, zs.minR), maxR = Math.max(minR, zs.maxR);
+        statusEl.textContent = 'Background zone: binary map...';
+        const binaryMap = buildZoneBinaryMap(adjustedData, threshold, 256);
+        statusEl.textContent = 'Background zone: distance map...';
+        const distMap = buildDistanceMap(binaryMap);
+        statusEl.textContent = 'Background zone: packing...';
+        const placed = packZone(binaryMap, distMap, minR, maxR);
+        totalPlaced += placed.length;
+        const globalColor = zs.colorMode === 'global' ? sampleGlobalColor(imgPixels, W, H, placed) : null;
+        for (const c of placed) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', c.x); circle.setAttribute('cy', c.y); circle.setAttribute('r', c.r);
+            let fill = zs.colorMode === 'per-circle' ? sampleCircleColor(imgPixels, W, H, c.x, c.y, c.r)
+                     : zs.colorMode === 'global'     ? globalColor
+                     : zs.solidColor;
+            circle.setAttribute('fill', fill);
+            fragment.appendChild(circle);
+        }
+    }
+
     outputSvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     outputSvg.setAttribute('width', W);
     outputSvg.setAttribute('height', H);
     outputSvg.innerHTML = '';
     outputSvg.appendChild(fragment);
 
-    statusEl.textContent = `Done. ${totalPlaced} circles placed across ${n} zone${n>1?'s':''}.`;
+    statusEl.textContent = `Done. ${totalPlaced} circles placed across ${n} zone${n>1?'s':''}${document.getElementById('bgZoneEnabled').checked?' + background':''}.`;
     downloadBtn.disabled = false;
 }
 
