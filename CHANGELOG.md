@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2026-04-07]
 
 ### Added
 - `main.js` — JavaScript extracted from `index.html` into a separate file
@@ -21,7 +21,7 @@
 - Threshold slider had no effect on packing area — candidates now require `binaryMap === 1`
 - Circles were not constrained to the black area boundary
 
-## [0.1.0] — Initial release
+## [2026-04-06] — Initial release
 
 - Basic HTML/JS circle packer
 - Image upload, hidden canvas for pixel processing
