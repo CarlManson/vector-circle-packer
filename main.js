@@ -60,14 +60,48 @@ function restoreImage() {
     } catch(e) {}
 }
 
-// --- Zone settings ---
-const ZONE_DEFAULTS = { minR: 2, maxR: 100, colorMode: 'solid', solidColor: '#000000' };
+// --- Zone mode helpers ---
+function getZoneMode() { return getSetting('zoneMode', 'brightness'); }
+function getHueStart() { return parseFloat(getSetting('hueStart', 0)); }
 
+function getZoneBounds(z, n, threshold) {
+    const lo = Math.round(z * threshold / n);
+    const hi = z === n - 1 ? threshold : Math.round((z + 1) * threshold / n);
+    return { lo, hi };
+}
+
+function getZoneHueBounds(z, n, offset) {
+    const size = 360 / n;
+    const lo = (offset + z * size) % 360;
+    const hi = (offset + (z + 1) * size) % 360;
+    return { lo, hi };
+}
+
+function rgbToHue(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    if (max === min) return 0;
+    const d = max - min;
+    let h;
+    if      (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else                h = (r - g) / d + 4;
+    return h * 60;
+}
+
+function updateModeUI() {
+    const mode = getZoneMode();
+    document.getElementById('modeBrightness').classList.toggle('active', mode === 'brightness');
+    document.getElementById('modeHue').classList.toggle('active', mode === 'hue');
+    document.getElementById('hueStartRow').style.display = mode === 'hue' ? 'block' : 'none';
+}
+
+// --- Zone settings ---
 function getZoneSettings(z) {
     return {
-        minR:      getSetting(`zone_${z}_minR`,      z === 0 ? 2 : 2),
-        maxR:      getSetting(`zone_${z}_maxR`,      100),
-        colorMode: getSetting(`zone_${z}_colorMode`, 'solid'),
+        minR:      getSetting(`zone_${z}_minR`,       2),
+        maxR:      getSetting(`zone_${z}_maxR`,       100),
+        colorMode: getSetting(`zone_${z}_colorMode`,  'solid'),
         solidColor:getSetting(`zone_${z}_solidColor`, '#000000'),
     };
 }
@@ -76,79 +110,94 @@ function saveZoneSetting(z, key, value) {
     saveSetting(`zone_${z}_${key}`, value);
 }
 
-function getZoneBounds(z, n, threshold) {
-    const lo = Math.round(z * threshold / n);
-    const hi = z === n - 1 ? threshold : Math.round((z + 1) * threshold / n);
-    return { lo, hi };
+function buildZonePanelEl(zKey, label, swatchColor, rangeText, s) {
+    const panel = document.createElement('div');
+    panel.className = 'zone-panel';
+    panel.dataset.zone = zKey;
+    panel.innerHTML = `
+        <div class="zone-header">
+            <span class="zone-swatch" style="background:${swatchColor}"></span>
+            ${label}
+            <span class="zone-range">${rangeText}</span>
+        </div>
+        <div class="zone-body">
+            <div class="zone-row">
+                <span>Min R</span>
+                <input type="number" class="zone-minR" value="${s.minR}" min="1" max="500">
+            </div>
+            <div class="zone-row">
+                <span>Max R</span>
+                <input type="number" class="zone-maxR" value="${s.maxR}" min="1" max="500">
+            </div>
+            <div class="radio-group" style="margin-top:8px;">
+                <label><input type="radio" name="z${zKey}_cm" value="solid"      ${s.colorMode==='solid'?'checked':''}> Solid colour</label>
+                <label><input type="radio" name="z${zKey}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}> Average per circle</label>
+                <label><input type="radio" name="z${zKey}_cm" value="global"     ${s.colorMode==='global'?'checked':''}> Global average</label>
+            </div>
+            <div class="zone-color-wrap" style="margin-top:6px;${s.colorMode!=='solid'?'display:none':''}">
+                <input type="color" class="zone-color" value="${s.solidColor}">
+            </div>
+        </div>`;
+
+    const minREl    = panel.querySelector('.zone-minR');
+    const maxREl    = panel.querySelector('.zone-maxR');
+    const colorEl   = panel.querySelector('.zone-color');
+    const colorWrap = panel.querySelector('.zone-color-wrap');
+    minREl.addEventListener('change', () => saveZoneSetting(zKey, 'minR', minREl.value));
+    maxREl.addEventListener('change', () => saveZoneSetting(zKey, 'maxR', maxREl.value));
+    colorEl.addEventListener('input',  () => saveZoneSetting(zKey, 'solidColor', colorEl.value));
+    panel.querySelectorAll(`input[name="z${zKey}_cm"]`).forEach(r => {
+        r.addEventListener('change', () => {
+            saveZoneSetting(zKey, 'colorMode', r.value);
+            colorWrap.style.display = r.value === 'solid' ? 'block' : 'none';
+        });
+    });
+    return panel;
 }
 
 function renderZonePanels() {
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     const threshold = parseInt(thresholdInput.value, 10);
+    const mode = getZoneMode();
+    const offset = getHueStart();
     const container = document.getElementById('zonesContainer');
     container.innerHTML = '';
-
     for (let z = 0; z < n; z++) {
-        const { lo, hi } = getZoneBounds(z, n, threshold);
-        const midGray = Math.round((lo + hi) / 2);
-        const s = getZoneSettings(z);
-
-        const panel = document.createElement('div');
-        panel.className = 'zone-panel';
-        panel.dataset.zone = z;
-
-        panel.innerHTML = `
-            <div class="zone-header">
-                <span class="zone-swatch" style="background:rgb(${midGray},${midGray},${midGray})"></span>
-                Zone ${z + 1}
-                <span class="zone-range">L: ${lo}–${hi}</span>
-            </div>
-            <div class="zone-body">
-                <div class="zone-row">
-                    <span>Min R</span>
-                    <input type="number" class="zone-minR" value="${s.minR}" min="1" max="500">
-                </div>
-                <div class="zone-row">
-                    <span>Max R</span>
-                    <input type="number" class="zone-maxR" value="${s.maxR}" min="1" max="500">
-                </div>
-                <div class="radio-group" style="margin-top:8px;">
-                    <label><input type="radio" name="z${z}_cm" value="solid"      ${s.colorMode==='solid'?'checked':''}> Solid colour</label>
-                    <label><input type="radio" name="z${z}_cm" value="per-circle" ${s.colorMode==='per-circle'?'checked':''}> Average per circle</label>
-                    <label><input type="radio" name="z${z}_cm" value="global"     ${s.colorMode==='global'?'checked':''}> Global average</label>
-                </div>
-                <div class="zone-color-wrap" style="margin-top:6px;${s.colorMode!=='solid'?'display:none':''}">
-                    <input type="color" class="zone-color" value="${s.solidColor}">
-                </div>
-            </div>`;
-
-        container.appendChild(panel);
-
-        // Wire events
-        const minREl   = panel.querySelector('.zone-minR');
-        const maxREl   = panel.querySelector('.zone-maxR');
-        const colorEl  = panel.querySelector('.zone-color');
-        const colorWrap= panel.querySelector('.zone-color-wrap');
-
-        minREl.addEventListener('change', () => saveZoneSetting(z, 'minR', minREl.value));
-        maxREl.addEventListener('change', () => saveZoneSetting(z, 'maxR', maxREl.value));
-        colorEl.addEventListener('input',  () => saveZoneSetting(z, 'solidColor', colorEl.value));
-        panel.querySelectorAll(`input[name="z${z}_cm"]`).forEach(r => {
-            r.addEventListener('change', () => {
-                saveZoneSetting(z, 'colorMode', r.value);
-                colorWrap.style.display = r.value === 'solid' ? 'block' : 'none';
-            });
-        });
+        let swatchColor, rangeText;
+        if (mode === 'hue') {
+            const { lo, hi } = getZoneHueBounds(z, n, offset);
+            const midHue = (offset + (z + 0.5) * 360 / n) % 360;
+            swatchColor = `hsl(${midHue.toFixed(0)},80%,50%)`;
+            rangeText = `${Math.round(lo)}°–${Math.round(hi === 0 ? 360 : hi)}°`;
+        } else {
+            const { lo, hi } = getZoneBounds(z, n, threshold);
+            const midGray = Math.round((lo + hi) / 2);
+            swatchColor = `rgb(${midGray},${midGray},${midGray})`;
+            rangeText = `L: ${lo}–${hi}`;
+        }
+        container.appendChild(buildZonePanelEl(z, `Zone ${z + 1}`, swatchColor, rangeText, getZoneSettings(z)));
     }
+    renderBgZonePanel();
 }
 
-function getZoneSettingsFromDOM(z) {
-    const panel = document.querySelector(`.zone-panel[data-zone="${z}"]`);
-    if (!panel) return getZoneSettings(z);
+function renderBgZonePanel() {
+    const threshold = parseInt(thresholdInput.value, 10);
+    const enabled = document.getElementById('bgZoneEnabled').checked;
+    const container = document.getElementById('bgZoneContainer');
+    container.innerHTML = '';
+    if (!enabled) return;
+    const midGray = Math.round((threshold + 255) / 2);
+    container.appendChild(buildZonePanelEl('bg', 'Background',
+        `rgb(${midGray},${midGray},${midGray})`, `L: ${threshold}–255`, getZoneSettings('bg')));
+}
+
+function getZoneSettingsFromDOM(zKey) {
+    const panel = document.querySelector(`.zone-panel[data-zone="${zKey}"]`);
+    if (!panel) return getZoneSettings(zKey);
     return {
         minR:      Math.max(1, parseInt(panel.querySelector('.zone-minR').value, 10) || 2),
         maxR:      parseInt(panel.querySelector('.zone-maxR').value, 10) || 100,
-        colorMode: panel.querySelector(`input[name="z${z}_cm"]:checked`)?.value || 'solid',
+        colorMode: panel.querySelector(`input[name="z${zKey}_cm"]:checked`)?.value || 'solid',
         solidColor:panel.querySelector('.zone-color').value || '#000000',
     };
 }
@@ -159,6 +208,8 @@ function loadSettings() {
         const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
         if (s.threshold !== undefined) { thresholdInput.value = s.threshold; thresholdVal.textContent = s.threshold; }
         if (s.numZones !== undefined) document.getElementById('numZones').value = s.numZones;
+        if (s.bgZoneEnabled !== undefined) document.getElementById('bgZoneEnabled').checked = s.bgZoneEnabled;
+        if (s.hueStart !== undefined) { document.getElementById('hueStart').value = s.hueStart; document.getElementById('hueStartVal').textContent = Math.round(s.hueStart) + '°'; }
         [
             { id: 'brightness', label: 'brightnessVal', decimals: 0 },
             { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
@@ -171,6 +222,7 @@ function loadSettings() {
             }
         });
     } catch(e) {}
+    updateModeUI();
     renderZonePanels();
 }
 
@@ -178,6 +230,25 @@ loadSettings();
 restoreImage();
 
 // --- Event listeners ---
+document.getElementById('modeBrightness').addEventListener('click', () => {
+    saveSetting('zoneMode', 'brightness');
+    updateModeUI();
+    renderZonePanels();
+    if (imageWidth > 0) renderThresholdPreview();
+});
+document.getElementById('modeHue').addEventListener('click', () => {
+    saveSetting('zoneMode', 'hue');
+    updateModeUI();
+    renderZonePanels();
+    if (imageWidth > 0) renderThresholdPreview();
+});
+document.getElementById('hueStart').addEventListener('input', e => {
+    document.getElementById('hueStartVal').textContent = Math.round(e.target.value) + '°';
+    saveSetting('hueStart', e.target.value);
+    renderZonePanels();
+    if (imageWidth > 0) renderThresholdPreview();
+});
+
 thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
     saveSetting('threshold', thresholdInput.value);
@@ -188,6 +259,12 @@ thresholdInput.addEventListener('input', () => {
 document.getElementById('numZones').addEventListener('change', e => {
     saveSetting('numZones', e.target.value);
     renderZonePanels();
+    if (imageWidth > 0) renderThresholdPreview();
+});
+
+document.getElementById('bgZoneEnabled').addEventListener('change', e => {
+    saveSetting('bgZoneEnabled', e.target.checked);
+    renderBgZonePanel();
     if (imageWidth > 0) renderThresholdPreview();
 });
 
@@ -267,6 +344,9 @@ function renderThresholdPreview() {
     const data = imageData.data;
     const threshold = parseInt(thresholdInput.value, 10);
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
+    const mode = getZoneMode();
+    const offset = getHueStart();
+    const bgEnabled = document.getElementById('bgZoneEnabled').checked;
 
     const previewCanvas = document.createElement('canvas');
     previewCanvas.width = imageWidth;
@@ -276,18 +356,39 @@ function renderThresholdPreview() {
 
     for (let i = 0; i < imageWidth * imageHeight; i++) {
         const si = i * 4;
-        const lum = data[si] * 0.299 + data[si + 1] * 0.587 + data[si + 2] * 0.114;
-        let v;
+        const r = data[si], g = data[si+1], b = data[si+2];
+        const lum = r * 0.299 + g * 0.587 + b * 0.114;
+        let pr, pg, pb;
+
         if (lum >= threshold) {
-            v = 255; // background
+            if (bgEnabled) {
+                const midGray = Math.round((threshold + 255) / 2);
+                pr = pg = pb = midGray;
+            } else {
+                pr = pg = pb = 255;
+            }
+        } else if (mode === 'hue') {
+            const hue = rgbToHue(r, g, b);
+            // find which zone this hue belongs to
+            let zoneIdx = 0;
+            for (let z = 0; z < n; z++) {
+                const { lo, hi } = getZoneHueBounds(z, n, offset);
+                const wraps = hi <= lo;
+                if (wraps ? (hue >= lo || hue < hi) : (hue >= lo && hue < hi)) { zoneIdx = z; break; }
+            }
+            const midHue = (offset + (zoneIdx + 0.5) * 360 / n) % 360;
+            // Convert hsl to rgb for preview
+            const [hr, hg, hb] = hslToRgb(midHue, 0.8, 0.5);
+            pr = hr; pg = hg; pb = hb;
         } else {
             const z = Math.min(n - 1, Math.floor(lum * n / threshold));
             const { lo, hi } = getZoneBounds(z, n, threshold);
-            v = Math.round((lo + hi) / 2);
+            pr = pg = pb = Math.round((lo + hi) / 2);
         }
-        previewData.data[si]     = v;
-        previewData.data[si + 1] = v;
-        previewData.data[si + 2] = v;
+
+        previewData.data[si]     = pr;
+        previewData.data[si + 1] = pg;
+        previewData.data[si + 2] = pb;
         previewData.data[si + 3] = 255;
     }
     pCtx.putImageData(previewData, 0, 0);
@@ -314,6 +415,20 @@ generateBtn.addEventListener('click', function() {
 });
 
 // --- Circle packing ---
+function hslToRgb(h, s, l) {
+    const c = (1 - Math.abs(2*l - 1)) * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = l - c/2;
+    let r=0,g=0,b=0;
+    if      (h < 60)  { r=c; g=x; }
+    else if (h < 120) { r=x; g=c; }
+    else if (h < 180) { g=c; b=x; }
+    else if (h < 240) { g=x; b=c; }
+    else if (h < 300) { r=x; b=c; }
+    else              { r=c; b=x; }
+    return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
+
 function buildZoneBinaryMap(adjustedData, lo, hi) {
     const total = imageWidth * imageHeight;
     const binaryMap = new Uint8Array(total);
@@ -321,6 +436,22 @@ function buildZoneBinaryMap(adjustedData, lo, hi) {
         const si = i * 4;
         const lum = adjustedData[si] * 0.299 + adjustedData[si + 1] * 0.587 + adjustedData[si + 2] * 0.114;
         if (lum >= lo && lum < hi) binaryMap[i] = 1;
+    }
+    return binaryMap;
+}
+
+function buildHueZoneBinaryMap(adjustedData, lo, hi, threshold) {
+    const total = imageWidth * imageHeight;
+    const binaryMap = new Uint8Array(total);
+    const wraps = hi <= lo; // hue range wraps around 360°
+    for (let i = 0; i < total; i++) {
+        const si = i * 4;
+        const r = adjustedData[si], g = adjustedData[si+1], b = adjustedData[si+2];
+        const lum = r * 0.299 + g * 0.587 + b * 0.114;
+        if (lum >= threshold) continue;
+        const hue = rgbToHue(r, g, b);
+        const inZone = wraps ? (hue >= lo || hue < hi) : (hue >= lo && hue < hi);
+        if (inZone) binaryMap[i] = 1;
     }
     return binaryMap;
 }
@@ -492,15 +623,23 @@ function packCircles() {
     fragment.appendChild(bg);
 
     let totalPlaced = 0;
+    const mode = getZoneMode();
+    const offset = getHueStart();
 
     for (let z = 0; z < n; z++) {
-        const { lo, hi } = getZoneBounds(z, n, threshold);
         const zs = getZoneSettingsFromDOM(z);
         const minR = Math.max(1, zs.minR);
         const maxR = Math.max(minR, zs.maxR);
 
         statusEl.textContent = `Zone ${z+1}/${n}: binary map...`;
-        const binaryMap = buildZoneBinaryMap(adjustedData, lo, hi);
+        let binaryMap;
+        if (mode === 'hue') {
+            const { lo, hi } = getZoneHueBounds(z, n, offset);
+            binaryMap = buildHueZoneBinaryMap(adjustedData, lo, hi, threshold);
+        } else {
+            const { lo, hi } = getZoneBounds(z, n, threshold);
+            binaryMap = buildZoneBinaryMap(adjustedData, lo, hi);
+        }
 
         statusEl.textContent = `Zone ${z+1}/${n}: distance map...`;
         const distMap = buildDistanceMap(binaryMap);
@@ -528,13 +667,36 @@ function packCircles() {
         }
     }
 
+    // Optional background zone (luminance >= threshold)
+    if (document.getElementById('bgZoneEnabled').checked) {
+        const zs = getZoneSettingsFromDOM('bg');
+        const minR = Math.max(1, zs.minR), maxR = Math.max(minR, zs.maxR);
+        statusEl.textContent = 'Background zone: binary map...';
+        const binaryMap = buildZoneBinaryMap(adjustedData, threshold, 256);
+        statusEl.textContent = 'Background zone: distance map...';
+        const distMap = buildDistanceMap(binaryMap);
+        statusEl.textContent = 'Background zone: packing...';
+        const placed = packZone(binaryMap, distMap, minR, maxR);
+        totalPlaced += placed.length;
+        const globalColor = zs.colorMode === 'global' ? sampleGlobalColor(imgPixels, W, H, placed) : null;
+        for (const c of placed) {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', c.x); circle.setAttribute('cy', c.y); circle.setAttribute('r', c.r);
+            let fill = zs.colorMode === 'per-circle' ? sampleCircleColor(imgPixels, W, H, c.x, c.y, c.r)
+                     : zs.colorMode === 'global'     ? globalColor
+                     : zs.solidColor;
+            circle.setAttribute('fill', fill);
+            fragment.appendChild(circle);
+        }
+    }
+
     outputSvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
     outputSvg.setAttribute('width', W);
     outputSvg.setAttribute('height', H);
     outputSvg.innerHTML = '';
     outputSvg.appendChild(fragment);
 
-    statusEl.textContent = `Done. ${totalPlaced} circles placed across ${n} zone${n>1?'s':''}.`;
+    statusEl.textContent = `Done. ${totalPlaced} circles placed across ${n} zone${n>1?'s':''}${document.getElementById('bgZoneEnabled').checked?' + background':''}.`;
     downloadBtn.disabled = false;
 }
 
