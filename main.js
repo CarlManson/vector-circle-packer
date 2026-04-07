@@ -60,9 +60,11 @@ function restoreImage() {
     } catch(e) {}
 }
 
-// --- Zone mode helpers ---
-function getZoneMode() { return getSetting('zoneMode', 'brightness'); }
-function getHueStart() { return parseFloat(getSetting('hueStart', 0)); }
+// --- Zone mode helpers (in-memory, localStorage is persistence only) ---
+let zoneMode = getSetting('zoneMode', 'brightness');
+let hueStart = parseFloat(getSetting('hueStart', 0));
+function getZoneMode() { return zoneMode; }
+function getHueStart() { return hueStart; }
 
 function getZoneBounds(z, n, threshold) {
     const lo = Math.round(z * threshold / n);
@@ -209,7 +211,8 @@ function loadSettings() {
         if (s.threshold !== undefined) { thresholdInput.value = s.threshold; thresholdVal.textContent = s.threshold; }
         if (s.numZones !== undefined) document.getElementById('numZones').value = s.numZones;
         if (s.bgZoneEnabled !== undefined) document.getElementById('bgZoneEnabled').checked = s.bgZoneEnabled;
-        if (s.hueStart !== undefined) { document.getElementById('hueStart').value = s.hueStart; document.getElementById('hueStartVal').textContent = Math.round(s.hueStart) + '°'; }
+        if (s.zoneMode !== undefined) zoneMode = s.zoneMode;
+        if (s.hueStart !== undefined) { hueStart = parseFloat(s.hueStart); document.getElementById('hueStart').value = s.hueStart; document.getElementById('hueStartVal').textContent = Math.round(s.hueStart) + '°'; }
         [
             { id: 'brightness', label: 'brightnessVal', decimals: 0 },
             { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
@@ -231,20 +234,23 @@ restoreImage();
 
 // --- Event listeners ---
 document.getElementById('modeBrightness').addEventListener('click', () => {
-    saveSetting('zoneMode', 'brightness');
+    zoneMode = 'brightness';
+    saveSetting('zoneMode', zoneMode);
     updateModeUI();
     renderZonePanels();
     if (imageWidth > 0) renderThresholdPreview();
 });
 document.getElementById('modeHue').addEventListener('click', () => {
-    saveSetting('zoneMode', 'hue');
+    zoneMode = 'hue';
+    saveSetting('zoneMode', zoneMode);
     updateModeUI();
     renderZonePanels();
     if (imageWidth > 0) renderThresholdPreview();
 });
 document.getElementById('hueStart').addEventListener('input', e => {
-    document.getElementById('hueStartVal').textContent = Math.round(e.target.value) + '°';
-    saveSetting('hueStart', e.target.value);
+    hueStart = parseFloat(e.target.value);
+    document.getElementById('hueStartVal').textContent = Math.round(hueStart) + '°';
+    saveSetting('hueStart', hueStart);
     renderZonePanels();
     if (imageWidth > 0) renderThresholdPreview();
 });
