@@ -11,7 +11,7 @@ const statusEl = document.getElementById('status');
 let imageWidth = 0;
 let imageHeight = 0;
 
-const TARGET_WIDTH = 500;
+const TARGET_WIDTH = 1000;
 
 thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
@@ -249,9 +249,9 @@ function packCircles() {
         const { idx, r: heapR } = heap.pop();
 
         // The heap may contain stale entries — skip if liveDist has since decreased
-        const currentR = Math.floor(liveDist[idx]);
+        const currentR = liveDist[idx];
         if (currentR < minR) continue;
-        if (currentR < Math.floor(heapR) - 0.5) {
+        if (currentR < heapR - 0.5) {
             // Stale — re-insert with updated value if still viable
             if (currentR >= minR) heap.push({ idx, r: currentR });
             continue;
