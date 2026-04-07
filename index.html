@@ -84,6 +84,16 @@
         .zone-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
         .zone-row span { min-width: 48px; font-size: 0.85em; }
         .zone-row input[type="number"] { flex: 1; padding: 4px 6px; }
+        /* Zone mode toggle */
+        .mode-toggle { display: flex; gap: 4px; margin-top: 4px; }
+        .mode-btn { flex: 1; padding: 6px; font-size: 13px; border: 1px solid #ccc; background: #f5f5f5; color: #555; border-radius: 4px; cursor: pointer; width: auto; margin-bottom: 0; }
+        .mode-btn:hover { background: #e8e8e8; }
+        .mode-btn.active { background: #007bff; color: white; border-color: #007bff; }
+        .mode-btn.active:hover { background: #0056b3; }
+        /* Hue slider */
+        .hue-slider { -webkit-appearance: none; appearance: none; height: 10px; border-radius: 5px; padding: 0; border: none; outline: none;
+            background: linear-gradient(to right,hsl(0,100%,50%),hsl(30,100%,50%),hsl(60,100%,50%),hsl(90,100%,50%),hsl(120,100%,50%),hsl(150,100%,50%),hsl(180,100%,50%),hsl(210,100%,50%),hsl(240,100%,50%),hsl(270,100%,50%),hsl(300,100%,50%),hsl(330,100%,50%),hsl(360,100%,50%)); }
+        .hue-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: white; border: 2px solid #444; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
     </style>
 </head>
 <body>
@@ -125,7 +135,19 @@
         </div>
     </div>
     <div class="control-group">
-        <div class="label-row">
+        <label>Zone mode</label>
+        <div class="mode-toggle">
+            <button class="mode-btn active" id="modeBrightness">Brightness</button>
+            <button class="mode-btn" id="modeHue">Hue</button>
+        </div>
+        <div id="hueStartRow" style="display:none; margin-top:10px;">
+            <div class="adj-row">
+                <span>Hue start</span>
+                <input type="range" id="hueStart" min="0" max="359" value="0" class="hue-slider">
+                <span class="adj-val" id="hueStartVal">0°</span>
+            </div>
+        </div>
+        <div class="label-row" style="margin-top:12px;">
             <label for="numZones">Zones</label>
         </div>
         <input type="number" id="numZones" value="1" min="1" max="8">
