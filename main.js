@@ -64,6 +64,17 @@ function loadSettings() {
             if (radio) radio.checked = true;
         }
         if (s.circleColor !== undefined) document.getElementById('circleColor').value = s.circleColor;
+        [
+            { id: 'brightness', label: 'brightnessVal', decimals: 0 },
+            { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
+            { id: 'gamma',      label: 'gammaVal',       decimals: 2 },
+            { id: 'blur',       label: 'blurVal',        decimals: 1 },
+        ].forEach(({ id, label, decimals }) => {
+            if (s[id] !== undefined) {
+                document.getElementById(id).value = s[id];
+                document.getElementById(label).textContent = parseFloat(s[id]).toFixed(decimals);
+            }
+        });
     } catch(e) {}
     updateColorPickerVisibility();
 }
@@ -90,6 +101,21 @@ thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
     saveSetting('threshold', thresholdInput.value);
     if (imageWidth > 0) renderThresholdPreview();
+});
+
+[
+    { id: 'brightness', label: 'brightnessVal', decimals: 0 },
+    { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
+    { id: 'gamma',      label: 'gammaVal',       decimals: 2 },
+    { id: 'blur',       label: 'blurVal',        decimals: 1 },
+].forEach(({ id, label, decimals }) => {
+    const el = document.getElementById(id);
+    const valEl = document.getElementById(label);
+    el.addEventListener('input', () => {
+        valEl.textContent = parseFloat(el.value).toFixed(decimals);
+        saveSetting(id, el.value);
+        if (imageWidth > 0) renderThresholdPreview();
+    });
 });
 
 imageUpload.addEventListener('change', function(e) {
@@ -120,8 +146,40 @@ imageUpload.addEventListener('change', function(e) {
     reader.readAsDataURL(file);
 });
 
+function getAdjustedImageData() {
+    const blur    = parseFloat(document.getElementById('blur').value) || 0;
+    const bright  = parseInt(document.getElementById('brightness').value, 10) || 0;
+    const contr   = parseInt(document.getElementById('contrast').value, 10) || 0;
+    const gamma   = parseFloat(document.getElementById('gamma').value) || 1.0;
+
+    // Apply blur via canvas filter, then read pixels
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = imageWidth;
+    tmpCanvas.height = imageHeight;
+    const tmpCtx = tmpCanvas.getContext('2d');
+    if (blur > 0) tmpCtx.filter = `blur(${blur}px)`;
+    tmpCtx.drawImage(hiddenCanvas, 0, 0);
+
+    const imageData = tmpCtx.getImageData(0, 0, imageWidth, imageHeight);
+    const data = imageData.data;
+
+    const contrastFactor = (259 * (contr * 2.55 + 255)) / (255 * (259 - contr * 2.55));
+    const gammaInv = 1 / gamma;
+
+    for (let i = 0; i < data.length; i += 4) {
+        for (let c = 0; c < 3; c++) {
+            let v = data[i + c];
+            v += bright;
+            v = contrastFactor * (v - 128) + 128;
+            v = 255 * Math.pow(Math.max(0, v) / 255, gammaInv);
+            data[i + c] = Math.max(0, Math.min(255, v + 0.5)) | 0;
+        }
+    }
+    return imageData;
+}
+
 function renderThresholdPreview() {
-    const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+    const imageData = getAdjustedImageData();
     const data = imageData.data;
     const threshold = parseInt(thresholdInput.value, 10);
 
@@ -169,7 +227,7 @@ generateBtn.addEventListener('click', function() {
 });
 
 function buildBinaryMap() {
-    const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
+    const imageData = getAdjustedImageData();
     const data = imageData.data;
     const threshold = parseInt(thresholdInput.value, 10);
     const binaryMap = new Uint8Array(imageWidth * imageHeight);
