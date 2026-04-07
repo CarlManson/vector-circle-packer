@@ -15,12 +15,41 @@ const TARGET_WIDTH = 1000;
 
 // --- Persistence ---
 const SETTINGS_KEY = 'circlePackerSettings';
+const IMAGE_KEY = 'circlePackerImage';
 
 function saveSetting(key, value) {
     try {
         const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
         s[key] = value;
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    } catch(e) {}
+}
+
+function saveImage() {
+    try {
+        localStorage.setItem(IMAGE_KEY, hiddenCanvas.toDataURL('image/jpeg', 0.85));
+    } catch(e) {}
+}
+
+function restoreImage() {
+    try {
+        const dataUrl = localStorage.getItem(IMAGE_KEY);
+        if (!dataUrl) return;
+        const img = new Image();
+        img.onload = function() {
+            imageWidth = img.width;
+            imageHeight = img.height;
+            hiddenCanvas.width = imageWidth;
+            hiddenCanvas.height = imageHeight;
+            ctx.drawImage(img, 0, 0);
+            outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
+            outputSvg.setAttribute('width', imageWidth);
+            outputSvg.setAttribute('height', imageHeight);
+            statusEl.textContent = `Image restored: ${imageWidth}×${imageHeight}px`;
+            downloadBtn.disabled = true;
+            renderThresholdPreview();
+        };
+        img.src = dataUrl;
     } catch(e) {}
 }
 
@@ -55,6 +84,7 @@ document.getElementById('minRadius').addEventListener('change', e => saveSetting
 document.getElementById('maxRadius').addEventListener('change', e => saveSetting('maxRadius', e.target.value));
 
 loadSettings();
+restoreImage();
 
 thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
@@ -75,6 +105,7 @@ imageUpload.addEventListener('change', function(e) {
             hiddenCanvas.width = imageWidth;
             hiddenCanvas.height = imageHeight;
             ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
+            saveImage();
 
             outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
             outputSvg.setAttribute('width', imageWidth);
