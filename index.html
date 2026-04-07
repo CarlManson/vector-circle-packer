@@ -58,6 +58,9 @@
         .radio-group { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
         .radio-group label { font-weight: normal; display: flex; align-items: center; gap: 6px; cursor: pointer; }
         input[type="color"] { width: 100%; height: 36px; padding: 2px; box-sizing: border-box; cursor: pointer; border: 1px solid #ccc; border-radius: 4px; }
+        .adj-row { display: grid; grid-template-columns: 72px 1fr 36px; align-items: center; gap: 6px; margin-top: 6px; }
+        .adj-row span:first-child { font-size: 0.85em; }
+        .adj-val { font-size: 0.8em; color: #666; text-align: right; }
         #status {
             margin-top: 12px;
             font-size: 0.85em;
@@ -95,6 +98,29 @@
     <div class="control-group">
         <label for="maxRadius">Maximum Radius (px)</label>
         <input type="number" id="maxRadius" value="100" min="1" max="500">
+    </div>
+    <div class="control-group">
+        <label>Image Adjustments</label>
+        <div class="adj-row">
+            <span>Brightness</span>
+            <input type="range" id="brightness" min="-100" max="100" value="0">
+            <span class="adj-val" id="brightnessVal">0</span>
+        </div>
+        <div class="adj-row">
+            <span>Contrast</span>
+            <input type="range" id="contrast" min="-100" max="100" value="0">
+            <span class="adj-val" id="contrastVal">0</span>
+        </div>
+        <div class="adj-row">
+            <span>Gamma</span>
+            <input type="range" id="gamma" min="0.1" max="3.0" step="0.05" value="1.0">
+            <span class="adj-val" id="gammaVal">1.00</span>
+        </div>
+        <div class="adj-row">
+            <span>Blur</span>
+            <input type="range" id="blur" min="0" max="20" step="0.5" value="0">
+            <span class="adj-val" id="blurVal">0</span>
+        </div>
     </div>
     <div class="control-group">
         <label>Circle Colour</label>
