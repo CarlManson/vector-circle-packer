@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stochastic Circle Packer</title>
+    <title>Circle Packer</title>
     <style>
         body {
             font-family: sans-serif;
@@ -11,7 +11,7 @@
             margin: 0;
             height: 100vh;
             background-color: #f4f4f4;
-            colour: #333;
+            color: #333;
         }
         .sidebar {
             width: 320px;
@@ -19,6 +19,7 @@
             background: #fff;
             border-right: 1px solid #ccc;
             box-sizing: border-box;
+            overflow-y: auto;
         }
         .main {
             flex-grow: 1;
@@ -30,25 +31,40 @@
             overflow: auto;
         }
         .control-group { margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        label { display: block; margin-bottom: 4px; font-weight: bold; }
+        .label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .label-row label { margin-bottom: 0; }
+        .label-value { font-size: 0.85em; color: #666; }
         input[type="file"], input[type="number"], input[type="range"] {
             width: 100%;
             box-sizing: border-box;
         }
+        input[type="number"] { padding: 6px; }
         button {
             width: 100%;
             padding: 12px;
             background: #007bff;
-            colour: white;
+            color: white;
             border: none;
             cursor: pointer;
             font-size: 16px;
             border-radius: 4px;
+            margin-bottom: 8px;
         }
         button:hover { background: #0056b3; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
+        #downloadBtn { background: #28a745; }
+        #downloadBtn:hover { background: #1e7e34; }
+        #status {
+            margin-top: 12px;
+            font-size: 0.85em;
+            color: #555;
+            min-height: 1.2em;
+        }
         svg {
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
             background: white;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
         }
@@ -63,14 +79,23 @@
         <input type="file" id="imageUpload" accept="image/png, image/jpeg">
     </div>
     <div class="control-group">
-        <label for="minRadius">Minimum Radius (px)</label>
-        <input type="number" id="minRadius" value="2" min="1">
-    </div>
-    <div class="control-group">
-        <label for="threshold">Black/White Threshold</label>
+        <div class="label-row">
+            <label for="threshold">Black/White Threshold</label>
+            <span class="label-value" id="thresholdVal">128</span>
+        </div>
         <input type="range" id="threshold" min="0" max="255" value="128">
     </div>
+    <div class="control-group">
+        <label for="minRadius">Minimum Radius (px)</label>
+        <input type="number" id="minRadius" value="2" min="1" max="50">
+    </div>
+    <div class="control-group">
+        <label for="maxRadius">Maximum Radius (px)</label>
+        <input type="number" id="maxRadius" value="100" min="1" max="500">
+    </div>
     <button id="generateBtn">Start Packing</button>
+    <button id="downloadBtn" disabled>Download SVG</button>
+    <div id="status"></div>
 </div>
 
 <div class="main">
@@ -78,81 +103,6 @@
     <svg id="outputSvg" xmlns="http://www.w3.org/2000/svg"></svg>
 </div>
 
-<script>
-    const imageUpload = document.getElementById('imageUpload');
-    const hiddenCanvas = document.getElementById('hiddenCanvas');
-    const ctx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
-    const outputSvg = document.getElementById('outputSvg');
-    const thresholdInput = document.getElementById('threshold');
-    const generateBtn = document.getElementById('generateBtn');
-
-    let imageWidth = 0;
-    let imageHeight = 0;
-    let binaryMap = [];
-
-    // Handle Image Upload
-    imageUpload.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            const img = new Image();
-            img.onload = function() {
-                imageWidth = img.width;
-                imageHeight = img.height;
-                hiddenCanvas.width = imageWidth;
-                hiddenCanvas.height = imageHeight;
-
-                // Prepare the SVG canvas to match the image dimensions
-                outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
-                outputSvg.innerHTML = '';
-
-                // Draw the image onto the hidden canvas
-                ctx.drawImage(img, 0, 0);
-            }
-            img.src = event.target.result;
-        }
-        reader.readAsDataURL(file);
-    });
-
-    // Handle Processing when the button is clicked
-    generateBtn.addEventListener('click', function() {
-        if (imageWidth === 0 || imageHeight === 0) {
-            alert("Please upload an image first.");
-            return;
-        }
-        processImage();
-    });
-
-    function processImage() {
-        const imageData = ctx.getImageData(0, 0, imageWidth, imageHeight);
-        const data = imageData.data;
-        const threshold = parseInt(thresholdInput.value, 10);
-
-        // Initialise a 2D array to hold our binary map (true = target area, false = empty)
-        binaryMap = new Array(imageWidth).fill(0).map(() => new Array(imageHeight).fill(false));
-
-        for (let y = 0; y < imageHeight; y++) {
-            for (let x = 0; x < imageWidth; x++) {
-                const index = (y * imageWidth + x) * 4;
-                const r = data[index];
-                const g = data[index + 1];
-                const b = data[index + 2];
-
-                // Calculate luminance to convert to greyscale
-                const luminance = (r * 0.299 + g * 0.587 + b * 0.114);
-
-                // Binarise: If the pixel is darker than the threshold, it is a valid space for a circle
-                if (luminance < threshold) {
-                    binaryMap[x][y] = true;
-                }
-            }
-        }
-
-        console.log("Image binarised successfully.");
-        // Next up: The Distance Map and Circle Packing algorithm
-    }
-</script>
+<script src="main.js"></script>
 </body>
 </html>
