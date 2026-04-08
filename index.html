@@ -186,7 +186,7 @@
             </div>
         </div>
 
-        <!-- Panel 2: Mode & Threshold -->
+        <!-- Panel 2: Mode & Zones setup -->
         <div class="step-panel d-none" id="panel1">
             <div class="mb-3">
                 <div class="section-label">Zone Mode</div>
@@ -195,28 +195,30 @@
                     <button type="button" class="btn btn-sm btn-outline-primary" id="modeHue">Hue</button>
                 </div>
             </div>
-            <div>
-                <label class="section-label">Threshold <span class="float-end fw-normal" id="thresholdVal">128</span></label>
-                <input type="range" id="threshold" class="form-range" min="0" max="255" value="128">
-                <div class="text-muted small mt-1">Pixels above this luminance are excluded (background).</div>
-            </div>
-        </div>
-
-        <!-- Panel 3: Zone Config -->
-        <div class="step-panel d-none" id="panel2">
             <div class="d-flex align-items-center gap-2 mb-3">
                 <span class="section-label mb-0">Number of zones</span>
                 <input type="number" id="numZones" class="form-control form-control-sm" style="width:70px;" value="1" min="1" max="8">
             </div>
-            <!-- Brightness: zone summary strips -->
-            <div id="panel2Brightness">
-                <div id="zoneSummaryContainer"></div>
+            <div id="thresholdSection" class="mb-3">
+                <label class="section-label">Threshold <span class="float-end fw-normal" id="thresholdVal">128</span></label>
+                <input type="range" id="threshold" class="form-range" min="0" max="255" value="128">
+                <div class="text-muted small mt-1">Pixels above this luminance are excluded (background).</div>
             </div>
+            <!-- Pre-calculated zone summary -->
+            <div id="zoneSummaryContainer"></div>
+        </div>
+
+        <!-- Panel 3: Zone Config (hue wheel / neutral zones) -->
+        <div class="step-panel d-none" id="panel2">
             <!-- Hue: colour wheel + neutral zones -->
             <div id="panel2Hue" class="d-none">
                 <div id="hueWheelContainer"></div>
                 <div id="blackZoneContainer"></div>
                 <div id="whiteZoneContainer"></div>
+            </div>
+            <!-- Brightness: nothing to configure here -->
+            <div id="panel2Brightness">
+                <p class="text-muted small">Zones are equal luminance bands. Proceed to step 4 to configure circle sizes and colours.</p>
             </div>
         </div>
 
