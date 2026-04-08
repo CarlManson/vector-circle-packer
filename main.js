@@ -61,14 +61,14 @@ function restoreImage() {
 }
 
 // --- Zone mode helpers (in-memory, localStorage is persistence only) ---
-let zoneMode       = getSetting('zoneMode', 'brightness');
-let hueStart       = parseFloat(getSetting('hueStart', 0));
+let zoneMode         = getSetting('zoneMode', 'brightness');
+let zoneHueStarts    = null; // array of N start angles; initialised on demand
 let blackZoneEnabled = getSetting('blackZoneEnabled', false);
 let blackThreshold   = parseInt(getSetting('blackThreshold', 20));
 let whiteZoneEnabled = getSetting('whiteZoneEnabled', false);
 let whiteThreshold   = parseInt(getSetting('whiteThreshold', 235));
-function getZoneMode()  { return zoneMode; }
-function getHueStart()  { return hueStart; }
+function getZoneMode() { return zoneMode; }
+
 // Effective luminance range for hue zones (shrinks when black/white zones active)
 function getHueLumRange() {
     const threshold = parseInt(thresholdInput.value, 10);
@@ -78,17 +78,62 @@ function getHueLumRange() {
     };
 }
 
+function ensureHueStarts(n) {
+    const saved = getSetting('zoneHueStarts', null);
+    if (!Array.isArray(zoneHueStarts) || zoneHueStarts.length !== n) {
+        if (Array.isArray(saved) && saved.length === n) {
+            zoneHueStarts = saved.map(Number);
+        } else {
+            zoneHueStarts = Array.from({ length: n }, (_, i) => (i * 360 / n));
+        }
+    }
+    return zoneHueStarts;
+}
+
+function resizeHueStarts(newN) {
+    const current = ensureHueStarts(zoneHueStarts ? zoneHueStarts.length : newN);
+    if (newN === current.length) return;
+    if (newN < current.length) {
+        zoneHueStarts = current.slice(0, newN);
+    } else {
+        const result = [...current];
+        while (result.length < newN) {
+            let maxGap = -1, maxIdx = 0;
+            for (let i = 0; i < result.length; i++) {
+                const lo = result[i], hi = result[(i + 1) % result.length];
+                const gap = hi > lo ? hi - lo : hi + 360 - lo;
+                if (gap > maxGap) { maxGap = gap; maxIdx = i; }
+            }
+            const lo = result[maxIdx], hi = result[(maxIdx + 1) % result.length];
+            const mid = hi > lo ? (lo + hi) / 2 : (lo + hi + 360) / 2 % 360;
+            result.splice(maxIdx + 1, 0, mid);
+        }
+        zoneHueStarts = result;
+    }
+    saveSetting('zoneHueStarts', zoneHueStarts);
+}
+
+function zoneMidHue(lo, hi) {
+    if (hi > lo) return (lo + hi) / 2;
+    return (lo + (hi + 360 - lo) / 2) % 360;
+}
+
+function hueToAngle(hue) { return (hue - 90) * Math.PI / 180; }
+
+function updateBgZoneVisibility() {
+    const section = document.getElementById('bgZoneSection');
+    if (section) section.style.display = (zoneMode === 'hue' && whiteZoneEnabled) ? 'none' : 'block';
+}
+
 function getZoneBounds(z, n, threshold) {
     const lo = Math.round(z * threshold / n);
     const hi = z === n - 1 ? threshold : Math.round((z + 1) * threshold / n);
     return { lo, hi };
 }
 
-function getZoneHueBounds(z, n, offset) {
-    const size = 360 / n;
-    const lo = (offset + z * size) % 360;
-    const hi = (offset + (z + 1) * size) % 360;
-    return { lo, hi };
+function getZoneHueBounds(z, n) {
+    const starts = ensureHueStarts(n);
+    return { lo: starts[z], hi: starts[(z + 1) % n] };
 }
 
 function rgbToHue(r, g, b) {
@@ -109,9 +154,10 @@ function updateModeUI() {
     const btnH = document.getElementById('modeHue');
     btnB.className = `btn btn-sm ${mode === 'brightness' ? 'btn-primary' : 'btn-outline-primary'}`;
     btnH.className = `btn btn-sm ${mode === 'hue'        ? 'btn-primary' : 'btn-outline-primary'}`;
-    document.getElementById('hueStartRow').style.display        = mode === 'hue' ? 'block' : 'none';
+    document.getElementById('hueWheelContainer').style.display  = mode === 'hue' ? 'block' : 'none';
     document.getElementById('blackZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
     document.getElementById('whiteZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
+    updateBgZoneVisibility();
 }
 
 // --- Zone settings ---
@@ -228,6 +274,7 @@ function buildNeutralZonePanel(key) {
         if (isBlack) { blackZoneEnabled = checkbox.checked; saveSetting('blackZoneEnabled', blackZoneEnabled); }
         else         { whiteZoneEnabled = checkbox.checked; saveSetting('whiteZoneEnabled', whiteZoneEnabled); }
         body.style.display = checkbox.checked ? 'block' : 'none';
+        if (!isBlack) updateBgZoneVisibility();
         if (imageWidth > 0) renderThresholdPreview();
     });
 
@@ -245,24 +292,159 @@ function buildNeutralZonePanel(key) {
     return panel;
 }
 
+function drawHueWheel(canvas, n) {
+    const cw = canvas.width;
+    const cx = cw / 2, cy = cw / 2;
+    const R  = cw * 0.40;
+    const r  = cw * 0.26;
+    const c  = canvas.getContext('2d');
+    c.clearRect(0, 0, cw, cw);
+    const starts = ensureHueStarts(n);
+
+    // Zone sectors
+    for (let z = 0; z < n; z++) {
+        const { lo, hi } = getZoneHueBounds(z, n);
+        const a1 = hueToAngle(lo);
+        const a2 = hueToAngle(hi > lo ? hi : hi + 360);
+        c.beginPath();
+        c.moveTo(cx, cy);
+        c.arc(cx, cy, r - 2, a1, a2);
+        c.closePath();
+        c.fillStyle = `hsl(${zoneMidHue(lo, hi).toFixed(0)},70%,65%)`;
+        c.fill();
+    }
+
+    // Hue ring
+    for (let i = 0; i < 360; i++) {
+        const a1 = hueToAngle(i), a2 = hueToAngle(i + 1);
+        c.beginPath();
+        c.arc(cx, cy, R, a1, a2);
+        c.arc(cx, cy, r, a2, a1, true);
+        c.closePath();
+        c.fillStyle = `hsl(${i},100%,50%)`;
+        c.fill();
+    }
+
+    // Boundary lines
+    for (let z = 0; z < n; z++) {
+        const a = hueToAngle(starts[z]);
+        c.beginPath();
+        c.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+        c.lineTo(cx + (R + 3) * Math.cos(a), cy + (R + 3) * Math.sin(a));
+        c.strokeStyle = 'white';
+        c.lineWidth = 2;
+        c.stroke();
+    }
+
+    // Drag handles
+    const NH = cw * 0.055;
+    for (let z = 0; z < n; z++) {
+        const a = hueToAngle(starts[z]);
+        const hx = cx + R * Math.cos(a), hy = cy + R * Math.sin(a);
+        c.beginPath();
+        c.arc(hx, hy, NH, 0, Math.PI * 2);
+        c.fillStyle = 'white';
+        c.fill();
+        c.strokeStyle = '#333';
+        c.lineWidth = 1.5;
+        c.stroke();
+        c.fillStyle = '#333';
+        c.font = `bold ${Math.round(cw * 0.07)}px system-ui`;
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(z + 1, hx, hy);
+    }
+}
+
+function setupHueWheelDrag(canvas, n, onUpdate) {
+    const cw = canvas.width;
+    const cx = cw / 2, cy = cw / 2;
+    const R  = cw * 0.40;
+    const NH = cw * 0.055 + 5;
+    let drag = -1;
+
+    function evPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const sx = cw / rect.width, sy = cw / rect.height;
+        const t = e.touches ? e.touches[0] : e;
+        return { x: (t.clientX - rect.left) * sx, y: (t.clientY - rect.top) * sy };
+    }
+    function angleToHue(x, y) {
+        let d = Math.atan2(y - cy, x - cx) * 180 / Math.PI + 90;
+        if (d < 0) d += 360;
+        if (d >= 360) d -= 360;
+        return d;
+    }
+    function hitTest(x, y) {
+        const starts = ensureHueStarts(n);
+        for (let z = 0; z < n; z++) {
+            const a = hueToAngle(starts[z]);
+            const hx = cx + R * Math.cos(a), hy = cy + R * Math.sin(a);
+            if ((x-hx)**2 + (y-hy)**2 <= NH*NH) return z;
+        }
+        return -1;
+    }
+
+    canvas.addEventListener('pointerdown', e => {
+        const p = evPos(e); drag = hitTest(p.x, p.y);
+        if (drag >= 0) { e.preventDefault(); canvas.setPointerCapture(e.pointerId); canvas.style.cursor = 'grabbing'; }
+    });
+    canvas.addEventListener('pointermove', e => {
+        if (drag < 0) return;
+        const p = evPos(e);
+        zoneHueStarts[drag] = angleToHue(p.x, p.y);
+        saveSetting('zoneHueStarts', zoneHueStarts);
+        drawHueWheel(canvas, n);
+        onUpdate();
+    });
+    canvas.addEventListener('pointerup', () => { if (drag >= 0) { drag = -1; canvas.style.cursor = 'grab'; } });
+    canvas.addEventListener('pointercancel', () => { drag = -1; });
+}
+
+function updateZonePanelRanges(n) {
+    for (let z = 0; z < n; z++) {
+        const panel = document.querySelector(`[data-zone="${z}"]`);
+        if (!panel) continue;
+        const { lo, hi } = getZoneHueBounds(z, n);
+        const swatch = panel.querySelector('.zone-swatch');
+        if (swatch) swatch.style.background = `hsl(${zoneMidHue(lo, hi).toFixed(0)},80%,50%)`;
+        const range = panel.querySelector('.zone-range');
+        if (range) range.textContent = `${Math.round(lo)}°–${Math.round(hi === 0 ? 360 : hi)}°`;
+    }
+}
+
 function renderZonePanels() {
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     const threshold = parseInt(thresholdInput.value, 10);
     const mode = getZoneMode();
-    const offset = getHueStart();
     const container = document.getElementById('zonesContainer');
+
+    // Hue wheel
+    const wheelContainer = document.getElementById('hueWheelContainer');
+    if (mode === 'hue') {
+        ensureHueStarts(n);
+        wheelContainer.innerHTML = '';
+        const canvas = document.createElement('canvas');
+        canvas.width = 240; canvas.height = 240;
+        canvas.style.cssText = 'width:100%;aspect-ratio:1;display:block;cursor:grab;margin-bottom:.5rem;border-radius:4px;';
+        wheelContainer.appendChild(canvas);
+        drawHueWheel(canvas, n);
+        setupHueWheelDrag(canvas, n, () => {
+            updateZonePanelRanges(n);
+            if (imageWidth > 0) renderThresholdPreview();
+        });
+    }
+
     container.innerHTML = '';
     for (let z = 0; z < n; z++) {
         let swatchColor, rangeText;
         if (mode === 'hue') {
-            const { lo, hi } = getZoneHueBounds(z, n, offset);
-            const midHue = (offset + (z + 0.5) * 360 / n) % 360;
-            swatchColor = `hsl(${midHue.toFixed(0)},80%,50%)`;
+            const { lo, hi } = getZoneHueBounds(z, n);
+            swatchColor = `hsl(${zoneMidHue(lo, hi).toFixed(0)},80%,50%)`;
             rangeText = `${Math.round(lo)}°–${Math.round(hi === 0 ? 360 : hi)}°`;
         } else {
             const { lo, hi } = getZoneBounds(z, n, threshold);
-            const midGray = Math.round((lo + hi) / 2);
-            swatchColor = `rgb(${midGray},${midGray},${midGray})`;
+            swatchColor = `rgb(${Math.round((lo+hi)/2)},${Math.round((lo+hi)/2)},${Math.round((lo+hi)/2)})`;
             rangeText = `L: ${lo}–${hi}`;
         }
         container.appendChild(buildZonePanelEl(z, `Zone ${z + 1}`, swatchColor, rangeText, getZoneSettings(z)));
@@ -279,6 +461,7 @@ function renderZonePanels() {
     }
 
     renderBgZonePanel();
+    updateBgZoneVisibility();
 }
 
 function renderBgZonePanel() {
@@ -310,8 +493,8 @@ function loadSettings() {
         if (s.threshold !== undefined) { thresholdInput.value = s.threshold; thresholdVal.textContent = s.threshold; }
         if (s.numZones !== undefined) document.getElementById('numZones').value = s.numZones;
         if (s.bgZoneEnabled !== undefined) document.getElementById('bgZoneEnabled').checked = s.bgZoneEnabled;
-        if (s.zoneMode      !== undefined) zoneMode      = s.zoneMode;
-        if (s.hueStart      !== undefined) { hueStart = parseFloat(s.hueStart); document.getElementById('hueStart').value = s.hueStart; document.getElementById('hueStartVal').textContent = Math.round(s.hueStart) + '°'; }
+        if (s.zoneMode        !== undefined) zoneMode      = s.zoneMode;
+        if (Array.isArray(s.zoneHueStarts))  zoneHueStarts = s.zoneHueStarts.map(Number);
         if (s.blackZoneEnabled !== undefined) blackZoneEnabled = s.blackZoneEnabled;
         if (s.blackThreshold   !== undefined) blackThreshold   = parseInt(s.blackThreshold);
         if (s.whiteZoneEnabled !== undefined) whiteZoneEnabled = s.whiteZoneEnabled;
@@ -350,14 +533,6 @@ document.getElementById('modeHue').addEventListener('click', () => {
     renderZonePanels();
     if (imageWidth > 0) renderThresholdPreview();
 });
-document.getElementById('hueStart').addEventListener('input', e => {
-    hueStart = parseFloat(e.target.value);
-    document.getElementById('hueStartVal').textContent = Math.round(hueStart) + '°';
-    saveSetting('hueStart', hueStart);
-    renderZonePanels();
-    if (imageWidth > 0) renderThresholdPreview();
-});
-
 thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
     saveSetting('threshold', thresholdInput.value);
@@ -366,6 +541,8 @@ thresholdInput.addEventListener('input', () => {
 });
 
 document.getElementById('numZones').addEventListener('change', e => {
+    const newN = parseInt(e.target.value, 10) || 1;
+    if (getZoneMode() === 'hue') resizeHueStarts(newN);
     saveSetting('numZones', e.target.value);
     renderZonePanels();
     if (imageWidth > 0) renderThresholdPreview();
@@ -454,7 +631,6 @@ function renderThresholdPreview() {
     const threshold = parseInt(thresholdInput.value, 10);
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     const mode = getZoneMode();
-    const offset = getHueStart();
     const bgEnabled = document.getElementById('bgZoneEnabled').checked;
 
     const previewCanvas = document.createElement('canvas');
@@ -486,11 +662,12 @@ function renderThresholdPreview() {
                 const hue = rgbToHue(r, g, b);
                 let zoneIdx = 0;
                 for (let z = 0; z < n; z++) {
-                    const { lo, hi } = getZoneHueBounds(z, n, offset);
+                    const { lo, hi } = getZoneHueBounds(z, n);
                     const wraps = hi <= lo;
                     if (wraps ? (hue >= lo || hue < hi) : (hue >= lo && hue < hi)) { zoneIdx = z; break; }
                 }
-                const midHue = (offset + (zoneIdx + 0.5) * 360 / n) % 360;
+                const { lo: zlo, hi: zhi } = getZoneHueBounds(zoneIdx, n);
+                const midHue = zoneMidHue(zlo, zhi);
                 const [hr, hg, hb] = hslToRgb(midHue, 0.8, 0.5);
                 pr = hr; pg = hg; pb = hb;
             } else {
@@ -740,7 +917,6 @@ function packCircles() {
 
     let totalPlaced = 0;
     const mode = getZoneMode();
-    const offset = getHueStart();
 
     for (let z = 0; z < n; z++) {
         const zs = getZoneSettingsFromDOM(z);
@@ -751,7 +927,7 @@ function packCircles() {
         let binaryMap;
         if (mode === 'hue') {
             const { lo: lumLo, hi: lumHi } = getHueLumRange();
-            const { lo, hi } = getZoneHueBounds(z, n, offset);
+            const { lo, hi } = getZoneHueBounds(z, n);
             binaryMap = buildHueZoneBinaryMap(adjustedData, lo, hi, lumLo, lumHi);
         } else {
             const { lo, hi } = getZoneBounds(z, n, threshold);
