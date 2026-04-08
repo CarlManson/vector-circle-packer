@@ -204,21 +204,19 @@
                 <input type="range" id="threshold" class="form-range" min="0" max="255" value="128">
                 <div class="text-muted small mt-1">Pixels above this luminance are excluded (background).</div>
             </div>
-            <!-- Pre-calculated zone summary -->
-            <div id="zoneSummaryContainer"></div>
         </div>
 
-        <!-- Panel 3: Zone Config (hue wheel / neutral zones) -->
+        <!-- Panel 3: Zone Config -->
         <div class="step-panel d-none" id="panel2">
+            <!-- Brightness: zone summary strips -->
+            <div id="panel2Brightness">
+                <div id="zoneSummaryContainer"></div>
+            </div>
             <!-- Hue: colour wheel + neutral zones -->
             <div id="panel2Hue" class="d-none">
                 <div id="hueWheelContainer"></div>
                 <div id="blackZoneContainer"></div>
                 <div id="whiteZoneContainer"></div>
-            </div>
-            <!-- Brightness: nothing to configure here -->
-            <div id="panel2Brightness">
-                <p class="text-muted small">Zones are equal luminance bands. Proceed to step 4 to configure circle sizes and colours.</p>
             </div>
         </div>
 

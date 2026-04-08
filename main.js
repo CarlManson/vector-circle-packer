@@ -401,6 +401,25 @@ function setupHueWheelDrag(canvas, n, onUpdate) {
     canvas.addEventListener('pointercancel', () => { drag = -1; });
 }
 
+function boostToMidLuminance(hex) {
+    if (!hex) return null;
+    const r = parseInt(hex.slice(1,3), 16) / 255;
+    const g = parseInt(hex.slice(3,5), 16) / 255;
+    const b = parseInt(hex.slice(5,7), 16) / 255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    let h = 0, s = 0;
+    if (d > 0) {
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        if      (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+        else if (max === g) h = ((b - r) / d + 2) * 60;
+        else                h = ((r - g) / d + 4) * 60;
+    }
+    const [nr, ng, nb] = hslToRgb(h, s, 0.5);
+    return rgbToHex(nr, ng, nb);
+}
+
 function computeAllSwatches(n) {
     if (imageWidth === 0) return null;
     const mode = getZoneMode();
@@ -434,7 +453,8 @@ function computeAllSwatches(n) {
             zS[z][0]+=r; zS[z][1]+=g; zS[z][2]+=b; zS[z][3]++;
         }
     }
-    const hex = ([r,g,b,c]) => c > 0 ? rgbToHex(Math.round(r/c), Math.round(g/c), Math.round(b/c)) : null;
+    const raw = ([r,g,b,c]) => c > 0 ? rgbToHex(Math.round(r/c), Math.round(g/c), Math.round(b/c)) : null;
+    const hex = arr => boostToMidLuminance(raw(arr));
     return { zones: zS.map(hex), black: hex(bkS), white: hex(wS), bg: hex(bgS) };
 }
 
@@ -469,9 +489,7 @@ function updateAccordionRanges(n) {
 }
 
 function buildPanel2() {
-    const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     updateModeUI(); // keep threshold visibility in sync
-    buildZoneSummary(n);
 }
 
 function buildPanel3() {
@@ -488,6 +506,8 @@ function buildPanel3() {
         bc.innerHTML = ''; wc.innerHTML = '';
         bc.appendChild(buildNeutralZonePanel('black', null));
         wc.appendChild(buildNeutralZonePanel('white', null));
+    } else {
+        buildZoneSummary(n);
     }
     updateBgZoneVisibility();
 }
@@ -711,7 +731,7 @@ thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
     saveSetting('threshold', thresholdInput.value);
     if (imageWidth > 0) renderZonePreview();
-    if (currentStep === 1) buildZoneSummary(parseInt(document.getElementById('numZones').value) || 1);
+    if (currentStep === 2) buildZoneSummary(parseInt(document.getElementById('numZones').value) || 1);
 });
 
 // --- Zone count (panel 2) ---
