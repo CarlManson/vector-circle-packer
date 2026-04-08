@@ -156,6 +156,8 @@ function updateModeUI() {
     const btnH = document.getElementById('modeHue');
     btnB.className = `btn btn-sm ${mode === 'brightness' ? 'btn-primary' : 'btn-outline-primary'}`;
     btnH.className = `btn btn-sm ${mode === 'hue'        ? 'btn-primary' : 'btn-outline-primary'}`;
+    const ts = document.getElementById('thresholdSection');
+    if (ts) ts.style.display = mode === 'hue' ? 'none' : '';
 }
 
 // --- Zone settings ---
@@ -466,6 +468,12 @@ function updateAccordionRanges(n) {
     }
 }
 
+function buildPanel2() {
+    const n = parseInt(document.getElementById('numZones').value, 10) || 1;
+    updateModeUI(); // keep threshold visibility in sync
+    buildZoneSummary(n);
+}
+
 function buildPanel3() {
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     const mode = getZoneMode();
@@ -480,8 +488,6 @@ function buildPanel3() {
         bc.innerHTML = ''; wc.innerHTML = '';
         bc.appendChild(buildNeutralZonePanel('black', null));
         wc.appendChild(buildNeutralZonePanel('white', null));
-    } else {
-        buildZoneSummary(n);
     }
     updateBgZoneVisibility();
 }
@@ -610,6 +616,7 @@ function showStep(n) {
     if (n === 0) {
         if (imageWidth > 0) renderAdjustedPreview();
     } else if (n === 1) {
+        buildPanel2();
         if (imageWidth > 0) renderZonePreview();
     } else if (n === 2) {
         buildPanel3();
@@ -685,6 +692,7 @@ document.getElementById('modeBrightness').addEventListener('click', () => {
     zoneMode = 'brightness';
     saveSetting('zoneMode', zoneMode);
     updateModeUI();
+    if (currentStep === 1) buildPanel2();
     if (currentStep === 2) buildPanel3();
     if (currentStep === 3) buildPanel4();
     if (imageWidth > 0) renderZonePreview();
@@ -693,6 +701,7 @@ document.getElementById('modeHue').addEventListener('click', () => {
     zoneMode = 'hue';
     saveSetting('zoneMode', zoneMode);
     updateModeUI();
+    if (currentStep === 1) buildPanel2();
     if (currentStep === 2) buildPanel3();
     if (currentStep === 3) buildPanel4();
     if (imageWidth > 0) renderZonePreview();
@@ -702,14 +711,15 @@ thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
     saveSetting('threshold', thresholdInput.value);
     if (imageWidth > 0) renderZonePreview();
-    if (currentStep === 2) buildZoneSummary(parseInt(document.getElementById('numZones').value) || 1);
+    if (currentStep === 1) buildZoneSummary(parseInt(document.getElementById('numZones').value) || 1);
 });
 
-// --- Zone count (panel 3) ---
+// --- Zone count (panel 2) ---
 document.getElementById('numZones').addEventListener('change', e => {
     const newN = parseInt(e.target.value, 10) || 1;
     if (getZoneMode() === 'hue') resizeHueStarts(newN);
     saveSetting('numZones', e.target.value);
+    if (currentStep === 1) buildPanel2();
     if (currentStep === 2) buildPanel3();
     if (currentStep === 3) buildPanel4();
     if (imageWidth > 0) renderZonePreview();
