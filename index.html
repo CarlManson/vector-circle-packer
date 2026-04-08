@@ -9,12 +9,19 @@
         body { overflow: hidden; }
 
         /* Layout */
-        #sidebar {
-            width: 320px;
-            min-width: 320px;
-            height: 100vh;
-            overflow-y: auto;
-            border-right: 1px solid var(--bs-border-color);
+        @media (min-width: 768px) {
+            #sidebar {
+                height: 100vh !important;
+                flex-shrink: 0;
+                background-color: var(--bs-body-bg) !important;
+                border-right: 1px solid var(--bs-border-color) !important;
+            }
+            #sidebar .offcanvas-body {
+                display: block !important;
+                overflow-y: auto !important;
+                padding: 1rem !important;
+                height: 100% !important;
+            }
         }
         #preview {
             flex: 1;
@@ -25,6 +32,9 @@
             background: var(--bs-secondary-bg);
             overflow: auto;
             padding: 1.5rem;
+        }
+        @media (max-width: 767.98px) {
+            #preview { padding-top: 3.5rem; }
         }
         #outputSvg {
             max-width: 100%;
@@ -111,9 +121,20 @@
 
 <canvas id="hiddenCanvas" style="display:none;"></canvas>
 
+<!-- Mobile hamburger -->
+<button class="d-md-none btn btn-sm btn-light border shadow-sm position-fixed top-0 start-0 m-2"
+        style="z-index:1051;" type="button"
+        data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">&#9776;</button>
+
 <!-- Sidebar -->
-<div id="sidebar" class="bg-body p-3">
-    <h5 class="fw-bold mb-3">Circle Packer</h5>
+<div id="sidebar" class="offcanvas-md offcanvas-start bg-body border-end"
+     style="--bs-offcanvas-width:320px;" tabindex="-1" aria-labelledby="sidebarLabel">
+    <div class="offcanvas-header d-md-none border-bottom">
+        <h5 class="offcanvas-title mb-0" id="sidebarLabel">Circle Packer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebar"></button>
+    </div>
+    <div class="offcanvas-body">
+    <h5 class="fw-bold mb-3 d-none d-md-block">Circle Packer</h5>
 
     <!-- Image upload -->
     <div class="mb-3">
@@ -190,9 +211,11 @@
     <div class="d-grid gap-2">
         <button id="generateBtn" class="btn btn-primary">Start Packing</button>
         <button id="downloadBtn" class="btn btn-success" disabled>Download SVG</button>
+        <button id="resetBtn" class="btn btn-outline-secondary btn-sm">Reset All Settings</button>
     </div>
     <p id="status" class="text-muted small mt-2 mb-0" style="min-height:1.2em;"></p>
-</div>
+    </div><!-- /offcanvas-body -->
+</div><!-- /sidebar -->
 
 <!-- Preview -->
 <div id="preview">
