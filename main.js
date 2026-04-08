@@ -54,7 +54,9 @@ function restoreImage() {
             outputSvg.setAttribute('height', imageHeight);
             statusEl.textContent = `Image restored: ${imageWidth}×${imageHeight}px`;
             downloadBtn.disabled = true;
-            renderThresholdPreview();
+            // showStep will pick the right preview when setTimeout fires
+            if (currentStep === 0) renderAdjustedPreview();
+            else renderZonePreview();
         };
         img.src = dataUrl;
     } catch(e) {}
@@ -154,10 +156,6 @@ function updateModeUI() {
     const btnH = document.getElementById('modeHue');
     btnB.className = `btn btn-sm ${mode === 'brightness' ? 'btn-primary' : 'btn-outline-primary'}`;
     btnH.className = `btn btn-sm ${mode === 'hue'        ? 'btn-primary' : 'btn-outline-primary'}`;
-    document.getElementById('hueWheelContainer').style.display  = mode === 'hue' ? 'block' : 'none';
-    document.getElementById('blackZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
-    document.getElementById('whiteZoneContainer').style.display = mode === 'hue' ? 'block' : 'none';
-    updateBgZoneVisibility();
 }
 
 // --- Zone settings ---
@@ -275,7 +273,7 @@ function buildNeutralZonePanel(key, swatchColor) {
         else         { whiteZoneEnabled = checkbox.checked; saveSetting('whiteZoneEnabled', whiteZoneEnabled); }
         body.style.display = checkbox.checked ? 'block' : 'none';
         if (!isBlack) updateBgZoneVisibility();
-        if (imageWidth > 0) renderThresholdPreview();
+        if (imageWidth > 0) renderZonePreview();
     });
 
     const threshEl    = panel.querySelector('.neutral-thresh');
@@ -285,7 +283,7 @@ function buildNeutralZonePanel(key, swatchColor) {
         if (isBlack) { blackThreshold = v; saveSetting('blackThreshold', v); rangeEl.textContent = `L: 0–${v}`; }
         else         { whiteThreshold = v; saveSetting('whiteThreshold', v); rangeEl.textContent = `L: ${v}–${threshold}`; }
         threshValEl.textContent = v;
-        if (imageWidth > 0) renderThresholdPreview();
+        if (imageWidth > 0) renderZonePreview();
     });
 
     wireZoneControls(panel, key);
@@ -438,44 +436,83 @@ function computeAllSwatches(n) {
     return { zones: zS.map(hex), black: hex(bkS), white: hex(wS), bg: hex(bgS) };
 }
 
-function updateZonePanelRanges(n) {
+// --- Panel builders ---
+
+function buildHueWheelUI(n) {
+    const wheelContainer = document.getElementById('hueWheelContainer');
+    ensureHueStarts(n);
+    wheelContainer.innerHTML = '';
+    const canvas = document.createElement('canvas');
+    canvas.width = 240; canvas.height = 240;
+    canvas.style.cssText = 'width:100%;aspect-ratio:1;display:block;cursor:grab;margin-bottom:.5rem;border-radius:4px;';
+    wheelContainer.appendChild(canvas);
+    drawHueWheel(canvas, n);
+    setupHueWheelDrag(canvas, n, () => {
+        // Live update: just refresh zone preview (swatch recompute skipped for speed)
+        updateAccordionRanges(n);
+        if (imageWidth > 0) renderZonePreview();
+    });
+}
+
+function updateAccordionRanges(n) {
     for (let z = 0; z < n; z++) {
-        const panel = document.querySelector(`[data-zone="${z}"]`);
-        if (!panel) continue;
+        const item = document.querySelector(`#zonesAccordion [data-zone="${z}"]`);
+        if (!item) continue;
         const { lo, hi } = getZoneHueBounds(z, n);
-        const swatch = panel.querySelector('.zone-swatch');
-        if (swatch) swatch.style.background = `hsl(${zoneMidHue(lo, hi).toFixed(0)},80%,50%)`;
-        const range = panel.querySelector('.zone-range');
-        if (range) range.textContent = `${Math.round(lo)}°–${Math.round(hi === 0 ? 360 : hi)}°`;
+        const sw = item.querySelector('.zone-swatch');
+        if (sw) sw.style.background = `hsl(${zoneMidHue(lo, hi).toFixed(0)},80%,50%)`;
+        const rng = item.querySelector('.zone-range');
+        if (rng) rng.textContent = `${Math.round(lo)}°–${Math.round(hi === 0 ? 360 : hi)}°`;
     }
 }
 
-function renderZonePanels() {
+function buildPanel3() {
+    const n = parseInt(document.getElementById('numZones').value, 10) || 1;
+    const mode = getZoneMode();
+
+    document.getElementById('panel2Brightness').classList.toggle('d-none', mode !== 'brightness');
+    document.getElementById('panel2Hue').classList.toggle('d-none', mode !== 'hue');
+
+    if (mode === 'hue') {
+        buildHueWheelUI(n);
+        const bc = document.getElementById('blackZoneContainer');
+        const wc = document.getElementById('whiteZoneContainer');
+        bc.innerHTML = ''; wc.innerHTML = '';
+        bc.appendChild(buildNeutralZonePanel('black', null));
+        wc.appendChild(buildNeutralZonePanel('white', null));
+    } else {
+        buildZoneSummary(n);
+    }
+    updateBgZoneVisibility();
+}
+
+function buildZoneSummary(n) {
+    const threshold = parseInt(thresholdInput.value, 10);
+    const sw = imageWidth > 0 ? computeAllSwatches(n) : null;
+    const container = document.getElementById('zoneSummaryContainer');
+    container.innerHTML = '';
+    for (let z = 0; z < n; z++) {
+        const { lo, hi } = getZoneBounds(z, n, threshold);
+        const mid = Math.round((lo + hi) / 2);
+        const swatch = sw?.zones[z] || `rgb(${mid},${mid},${mid})`;
+        const div = document.createElement('div');
+        div.className = 'zone-summary';
+        div.innerHTML = `<span class="zone-swatch" style="background:${swatch};"></span>
+                         <span>Zone ${z + 1}</span>
+                         <span class="ms-auto text-muted small">L: ${lo}–${hi}</span>`;
+        container.appendChild(div);
+    }
+}
+
+function buildPanel4() {
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     const threshold = parseInt(thresholdInput.value, 10);
     const mode = getZoneMode();
-    const container = document.getElementById('zonesContainer');
-
-    // Hue wheel
-    const wheelContainer = document.getElementById('hueWheelContainer');
-    if (mode === 'hue') {
-        ensureHueStarts(n);
-        wheelContainer.innerHTML = '';
-        const canvas = document.createElement('canvas');
-        canvas.width = 240; canvas.height = 240;
-        canvas.style.cssText = 'width:100%;aspect-ratio:1;display:block;cursor:grab;margin-bottom:.5rem;border-radius:4px;';
-        wheelContainer.appendChild(canvas);
-        drawHueWheel(canvas, n);
-        setupHueWheelDrag(canvas, n, () => {
-            updateZonePanelRanges(n);
-            if (imageWidth > 0) renderThresholdPreview();
-        });
-    }
-
-    // Compute image-based average colours for swatches (single pass)
     const sw = imageWidth > 0 ? computeAllSwatches(n) : null;
 
-    container.innerHTML = '';
+    const accordion = document.getElementById('zonesAccordion');
+    accordion.innerHTML = '';
+
     for (let z = 0; z < n; z++) {
         let swatchColor, rangeText;
         if (mode === 'hue') {
@@ -484,24 +521,50 @@ function renderZonePanels() {
             rangeText = `${Math.round(lo)}°–${Math.round(hi === 0 ? 360 : hi)}°`;
         } else {
             const { lo, hi } = getZoneBounds(z, n, threshold);
-            swatchColor = sw?.zones[z] || `rgb(${Math.round((lo+hi)/2)},${Math.round((lo+hi)/2)},${Math.round((lo+hi)/2)})`;
+            const mid = Math.round((lo + hi) / 2);
+            swatchColor = sw?.zones[z] || `rgb(${mid},${mid},${mid})`;
             rangeText = `L: ${lo}–${hi}`;
         }
-        container.appendChild(buildZonePanelEl(z, `Zone ${z + 1}`, swatchColor, rangeText, getZoneSettings(z)));
+        accordion.appendChild(buildZoneAccordionItem(z, `Zone ${z + 1}`, swatchColor, rangeText, getZoneSettings(z), z === 0));
     }
 
-    // Neutral zones (hue mode only)
-    const blackContainer = document.getElementById('blackZoneContainer');
-    const whiteContainer = document.getElementById('whiteZoneContainer');
-    blackContainer.innerHTML = '';
-    whiteContainer.innerHTML = '';
+    // Neutral zones (hue mode)
     if (mode === 'hue') {
-        blackContainer.appendChild(buildNeutralZonePanel('black', sw?.black));
-        whiteContainer.appendChild(buildNeutralZonePanel('white', sw?.white));
+        for (const key of ['black', 'white']) {
+            const isBlack = key === 'black';
+            const enabled = isBlack ? blackZoneEnabled : whiteZoneEnabled;
+            if (!enabled) continue;
+            const lo = isBlack ? 0 : whiteThreshold;
+            const hi = isBlack ? blackThreshold : threshold;
+            const label = isBlack ? 'Black zone' : 'White zone';
+            const swatch = sw?.[key] || (isBlack ? '#111' : '#eee');
+            accordion.appendChild(buildZoneAccordionItem(key, label, swatch, `L: ${lo}–${hi}`, getZoneSettings(key), false));
+        }
     }
 
     renderBgZonePanel(sw?.bg);
     updateBgZoneVisibility();
+}
+
+function buildZoneAccordionItem(zKey, label, swatchColor, rangeText, s, expanded) {
+    const item = document.createElement('div');
+    item.className = 'accordion-item';
+    item.dataset.zone = zKey;
+    const colId = `zacc-${zKey}`;
+    item.innerHTML = `
+        <h2 class="accordion-header">
+            <button class="accordion-button${expanded ? '' : ' collapsed'}" type="button"
+                    data-bs-toggle="collapse" data-bs-target="#${colId}">
+                <span class="zone-swatch me-2" style="background:${swatchColor}"></span>
+                ${label}
+                <span class="zone-range">${rangeText}</span>
+            </button>
+        </h2>
+        <div id="${colId}" class="accordion-collapse collapse${expanded ? ' show' : ''}">
+            <div class="accordion-body">${zoneControlsHTML(zKey, s)}</div>
+        </div>`;
+    wireZoneControls(item, zKey);
+    return item;
 }
 
 function renderBgZonePanel(swatchColor) {
@@ -524,6 +587,49 @@ function getZoneSettingsFromDOM(zKey) {
         colorMode: panel.querySelector(`input[name="z${zKey}_cm"]:checked`)?.value || 'solid',
         solidColor:panel.querySelector('.zone-color').value || '#000000',
     };
+}
+
+// --- Step navigation ---
+let currentStep = 0;
+
+function showStep(n) {
+    currentStep = n;
+    document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('d-none', i !== n));
+    document.querySelectorAll('.step-btn').forEach((b, i) => b.classList.toggle('active', i === n));
+    document.getElementById('prevBtn').disabled = (n === 0);
+    const nextBtn = document.getElementById('nextBtn');
+    nextBtn.style.display = n === 3 ? 'none' : '';
+    document.getElementById('stepLabel').textContent = `Step ${n + 1} of 4`;
+
+    if (n === 0) {
+        if (imageWidth > 0) renderAdjustedPreview();
+    } else if (n === 1) {
+        if (imageWidth > 0) renderZonePreview();
+    } else if (n === 2) {
+        buildPanel3();
+        if (imageWidth > 0) renderZonePreview();
+    } else if (n === 3) {
+        buildPanel4();
+        // keep current preview
+    }
+    saveSetting('currentStep', n);
+}
+
+// --- Preview functions ---
+function renderAdjustedPreview() {
+    if (imageWidth === 0) return;
+    const imageData = getAdjustedImageData();
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = imageWidth; tmpCanvas.height = imageHeight;
+    tmpCanvas.getContext('2d').putImageData(imageData, 0, 0);
+    outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
+    outputSvg.setAttribute('width', imageWidth);
+    outputSvg.setAttribute('height', imageHeight);
+    outputSvg.innerHTML = '';
+    const imgEl = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+    imgEl.setAttribute('width', imageWidth); imgEl.setAttribute('height', imageHeight);
+    imgEl.setAttribute('href', tmpCanvas.toDataURL());
+    outputSvg.appendChild(imgEl);
 }
 
 // --- Load settings ---
@@ -550,50 +656,67 @@ function loadSettings() {
                 document.getElementById(label).textContent = parseFloat(s[id]).toFixed(decimals);
             }
         });
+        if (s.currentStep !== undefined) currentStep = parseInt(s.currentStep) || 0;
     } catch(e) {}
     updateModeUI();
-    renderZonePanels();
 }
 
 loadSettings();
 restoreImage();
 
-// --- Event listeners ---
+// Navigate to the saved step after image may have been restored
+setTimeout(() => showStep(currentStep), 0);
+
+// --- Step nav events ---
+document.querySelectorAll('.step-btn').forEach(btn => {
+    btn.addEventListener('click', () => showStep(parseInt(btn.dataset.step)));
+});
+document.getElementById('prevBtn').addEventListener('click', () => showStep(currentStep - 1));
+document.getElementById('nextBtn').addEventListener('click', () => showStep(currentStep + 1));
+
+// --- Mode events (panel 2) ---
 document.getElementById('modeBrightness').addEventListener('click', () => {
     zoneMode = 'brightness';
     saveSetting('zoneMode', zoneMode);
     updateModeUI();
-    renderZonePanels();
-    if (imageWidth > 0) renderThresholdPreview();
+    if (currentStep === 2) buildPanel3();
+    if (currentStep === 3) buildPanel4();
+    if (imageWidth > 0) renderZonePreview();
 });
 document.getElementById('modeHue').addEventListener('click', () => {
     zoneMode = 'hue';
     saveSetting('zoneMode', zoneMode);
     updateModeUI();
-    renderZonePanels();
-    if (imageWidth > 0) renderThresholdPreview();
+    if (currentStep === 2) buildPanel3();
+    if (currentStep === 3) buildPanel4();
+    if (imageWidth > 0) renderZonePreview();
 });
+
 thresholdInput.addEventListener('input', () => {
     thresholdVal.textContent = thresholdInput.value;
     saveSetting('threshold', thresholdInput.value);
-    renderZonePanels();
-    if (imageWidth > 0) renderThresholdPreview();
+    if (imageWidth > 0) renderZonePreview();
+    if (currentStep === 2) buildZoneSummary(parseInt(document.getElementById('numZones').value) || 1);
 });
 
+// --- Zone count (panel 3) ---
 document.getElementById('numZones').addEventListener('change', e => {
     const newN = parseInt(e.target.value, 10) || 1;
     if (getZoneMode() === 'hue') resizeHueStarts(newN);
     saveSetting('numZones', e.target.value);
-    renderZonePanels();
-    if (imageWidth > 0) renderThresholdPreview();
+    if (currentStep === 2) buildPanel3();
+    if (currentStep === 3) buildPanel4();
+    if (imageWidth > 0) renderZonePreview();
 });
 
+// --- Background zone (panel 4) ---
 document.getElementById('bgZoneEnabled').addEventListener('change', e => {
     saveSetting('bgZoneEnabled', e.target.checked);
     renderBgZonePanel();
-    if (imageWidth > 0) renderThresholdPreview();
+    updateBgZoneVisibility();
 });
 
+// --- Image adjustment sliders (panel 1) ---
 [
     { id: 'brightness', label: 'brightnessVal', decimals: 0 },
     { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
@@ -605,7 +728,9 @@ document.getElementById('bgZoneEnabled').addEventListener('change', e => {
     el.addEventListener('input', () => {
         valEl.textContent = parseFloat(el.value).toFixed(decimals);
         saveSetting(id, el.value);
-        if (imageWidth > 0) renderThresholdPreview();
+        if (imageWidth === 0) return;
+        if (currentStep === 0) renderAdjustedPreview();
+        else renderZonePreview();
     });
 });
 
@@ -618,8 +743,7 @@ imageUpload.addEventListener('change', function(e) {
         img.onload = function() {
             imageWidth = TARGET_WIDTH;
             imageHeight = Math.round(img.height * (TARGET_WIDTH / img.width));
-            hiddenCanvas.width = imageWidth;
-            hiddenCanvas.height = imageHeight;
+            hiddenCanvas.width = imageWidth; hiddenCanvas.height = imageHeight;
             ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
             saveImage();
             outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
@@ -627,7 +751,7 @@ imageUpload.addEventListener('change', function(e) {
             outputSvg.setAttribute('height', imageHeight);
             statusEl.textContent = `Image loaded: ${imageWidth}×${imageHeight}px`;
             downloadBtn.disabled = true;
-            renderThresholdPreview();
+            renderAdjustedPreview();
         };
         img.src = event.target.result;
     };
@@ -672,7 +796,7 @@ function getAdjustedImageData() {
     return imageData;
 }
 
-function renderThresholdPreview() {
+function renderZonePreview() {
     const imageData = getAdjustedImageData();
     const data = imageData.data;
     const threshold = parseInt(thresholdInput.value, 10);
@@ -733,6 +857,9 @@ function renderThresholdPreview() {
     }
     pCtx.putImageData(previewData, 0, 0);
 
+    outputSvg.setAttribute('viewBox', `0 0 ${imageWidth} ${imageHeight}`);
+    outputSvg.setAttribute('width', imageWidth);
+    outputSvg.setAttribute('height', imageHeight);
     outputSvg.innerHTML = '';
     const imgEl = document.createElementNS('http://www.w3.org/2000/svg', 'image');
     imgEl.setAttribute('width', imageWidth);
