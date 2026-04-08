@@ -525,7 +525,9 @@ function buildPanel4() {
             swatchColor = sw?.zones[z] || `rgb(${mid},${mid},${mid})`;
             rangeText = `L: ${lo}–${hi}`;
         }
-        accordion.appendChild(buildZoneAccordionItem(z, `Zone ${z + 1}`, swatchColor, rangeText, getZoneSettings(z), z === 0));
+        const s = getZoneSettings(z);
+        if (!getSetting(`zone_${z}_solidColor`, null)) s.solidColor = swatchColor || '#000000';
+        accordion.appendChild(buildZoneAccordionItem(z, `Zone ${z + 1}`, swatchColor, rangeText, s, z === 0));
     }
 
     // Neutral zones (hue mode)
@@ -538,7 +540,9 @@ function buildPanel4() {
             const hi = isBlack ? blackThreshold : threshold;
             const label = isBlack ? 'Black zone' : 'White zone';
             const swatch = sw?.[key] || (isBlack ? '#111' : '#eee');
-            accordion.appendChild(buildZoneAccordionItem(key, label, swatch, `L: ${lo}–${hi}`, getZoneSettings(key), false));
+            const ks = getZoneSettings(key);
+            if (!getSetting(`zone_${key}_solidColor`, null)) ks.solidColor = swatch || '#000000';
+            accordion.appendChild(buildZoneAccordionItem(key, label, swatch, `L: ${lo}–${hi}`, ks, false));
         }
     }
 
@@ -575,7 +579,9 @@ function renderBgZonePanel(swatchColor) {
     if (!enabled) return;
     const midGray = Math.round((threshold + 255) / 2);
     const swatch = swatchColor || `rgb(${midGray},${midGray},${midGray})`;
-    container.appendChild(buildZonePanelEl('bg', 'Background', swatch, `L: ${threshold}–255`, getZoneSettings('bg')));
+    const bgs = getZoneSettings('bg');
+    if (!getSetting('zone_bg_solidColor', null)) bgs.solidColor = swatch;
+    container.appendChild(buildZonePanelEl('bg', 'Background', swatch, `L: ${threshold}–255`, bgs));
 }
 
 function getZoneSettingsFromDOM(zKey) {
