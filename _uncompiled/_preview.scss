@@ -5,13 +5,29 @@
   height: 100vh;
   display: flex;
   align-items: center;
+
   justify-content: center;
   background: var(--bs-secondary-bg);
   overflow: auto;
-  padding: $spacing-xl;
+  position: relative;
+  flex-direction: column;
 
   @media (max-width: $bp-md-max) {
     padding-top: 3.5rem;
+  }
+
+  &Content {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  #outputSvg, #previewCanvas{
+    object-fit: contain;
   }
 }
 
@@ -19,7 +35,8 @@
 #previewCanvas {
   max-width: 100%;
   max-height: 100%;
-  background: white;
+  background: transparent;
   box-shadow: $preview-shadow;
   border-radius: $preview-radius;
+  border: 1px solid var(--bs-border-color);
 }

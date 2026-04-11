@@ -12,6 +12,7 @@ const statusEl = document.getElementById('status');
 
 let imageWidth = 0;
 let imageHeight = 0;
+let highlightZone = null; // zone key to isolate in preview, or null for all
 
 // --- Performance: adjusted image cache ---
 let _adjustedCache = null;
@@ -588,6 +589,7 @@ function buildPanel4() {
 
     const accordion = document.getElementById('zonesAccordion');
     accordion.innerHTML = '';
+    highlightZone = '0'; // first zone starts expanded
 
     for (let z = 0; z < n; z++) {
         let swatchColor, rangeText;
@@ -624,6 +626,26 @@ function buildPanel4() {
 
     renderBgZonePanel(sw?.bg);
     updateBgZoneVisibility();
+
+    // Highlight active zone in preview when an accordion item is opened
+    accordion.addEventListener('show.bs.collapse', (e) => {
+        const item = e.target.closest('.accordion-item');
+        if (item) {
+            highlightZone = item.dataset.zone;
+            if (imageWidth > 0) renderZonePreview();
+        }
+    });
+    accordion.addEventListener('hide.bs.collapse', (e) => {
+        const item = e.target.closest('.accordion-item');
+        if (item && item.dataset.zone == highlightZone) {
+            // Find another open accordion, if any
+            const otherOpen = accordion.querySelector('.accordion-collapse.show:not(#' + e.target.id + ')');
+            highlightZone = otherOpen
+                ? otherOpen.closest('.accordion-item').dataset.zone
+                : null;
+            if (imageWidth > 0) renderZonePreview();
+        }
+    });
 }
 
 function buildZoneAccordionItem(zKey, label, swatchColor, rangeText, s, expanded) {
@@ -676,6 +698,7 @@ let currentStep = 0;
 
 function showStep(n) {
     currentStep = n;
+    if (n !== 3) highlightZone = null;
     document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('d-none', i !== n));
     document.querySelectorAll('.step-btn').forEach((b, i) => b.classList.toggle('active', i === n));
     document.getElementById('prevBtn').disabled = (n === 0);
@@ -693,7 +716,7 @@ function showStep(n) {
         if (imageWidth > 0) renderZonePreview();
     } else if (n === 3) {
         buildPanel4();
-        // keep current preview
+        if (imageWidth > 0) renderZonePreview();
     }
     saveSetting('currentStep', n);
 }
@@ -905,6 +928,16 @@ function renderZonePreview() {
     const bgEnabled = document.getElementById('bgZoneEnabled').checked;
     const total = imageWidth * imageHeight;
 
+    // Only highlight when on the Circles panel (step 3)
+    const hl = currentStep === 3 ? highlightZone : null;
+    // Parse highlight zone key for fast comparison in the loop
+    const hlIsNum = hl !== null && !isNaN(hl);
+    const hlIdx = hlIsNum ? parseInt(hl, 10) : -1;
+    const hlIsBg = hl === 'bg';
+    const hlIsBlack = hl === 'black';
+    const hlIsWhite = hl === 'white';
+    const dimAlpha = 0; // fully hide non-highlighted zones
+
     previewCanvas.width = imageWidth;
     previewCanvas.height = imageHeight;
     const previewData = previewCtx.createImageData(imageWidth, imageHeight);
@@ -934,13 +967,13 @@ function renderZonePreview() {
             const si = i * 4;
             const r = data[si], g = data[si + 1], b = data[si + 2];
             const lum = r * 0.299 + g * 0.587 + b * 0.114;
-            let pr, pg, pb;
+            let pr, pg, pb, zoneTag;
             if (lum >= threshold) {
-                pr = pg = pb = bgGray;
+                pr = pg = pb = bgGray; zoneTag = 'bg';
             } else if (useBk && lum < bkTh) {
-                pr = pg = pb = 20;
+                pr = pg = pb = 20; zoneTag = 'black';
             } else if (useWh && lum >= whTh) {
-                pr = pg = pb = 235;
+                pr = pg = pb = 235; zoneTag = 'white';
             } else if (lum >= lumLo && lum < lumHi) {
                 const hue = rgbToHue(r, g, b);
                 let zi = 0;
@@ -950,11 +983,17 @@ function renderZonePreview() {
                         : (hue >= zoneLo[z] && hue < zoneHi[z]);
                     if (inZone) { zi = z; break; }
                 }
-                pr = zoneR[zi]; pg = zoneG[zi]; pb = zoneB[zi];
+                pr = zoneR[zi]; pg = zoneG[zi]; pb = zoneB[zi]; zoneTag = zi;
             } else {
-                pr = pg = pb = 255;
+                pr = pg = pb = 255; zoneTag = 'none';
             }
-            out[si] = pr; out[si + 1] = pg; out[si + 2] = pb; out[si + 3] = 255;
+            const active = hl === null
+                || (hlIsNum && zoneTag === hlIdx)
+                || (hlIsBg && zoneTag === 'bg')
+                || (hlIsBlack && zoneTag === 'black')
+                || (hlIsWhite && zoneTag === 'white');
+            out[si] = pr; out[si + 1] = pg; out[si + 2] = pb;
+            out[si + 3] = active ? 255 : dimAlpha;
         }
     } else {
         // Brightness mode — pre-compute zone grays
@@ -969,13 +1008,18 @@ function renderZonePreview() {
         for (let i = 0; i < total; i++) {
             const si = i * 4;
             const lum = data[si] * 0.299 + data[si + 1] * 0.587 + data[si + 2] * 0.114;
-            let v;
+            let v, zi;
             if (lum >= threshold) {
-                v = bgGray;
+                v = bgGray; zi = -1;
             } else {
-                v = zoneGray[Math.min(n - 1, (lum * invThreshold) | 0)];
+                zi = Math.min(n - 1, (lum * invThreshold) | 0);
+                v = zoneGray[zi];
             }
-            out[si] = v; out[si + 1] = v; out[si + 2] = v; out[si + 3] = 255;
+            const active = hl === null
+                || (hlIsNum && zi === hlIdx)
+                || (hlIsBg && zi === -1);
+            out[si] = v; out[si + 1] = v; out[si + 2] = v;
+            out[si + 3] = active ? 255 : dimAlpha;
         }
     }
 
