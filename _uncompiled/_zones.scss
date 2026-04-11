@@ -1,0 +1,64 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// Zone swatches (coloured indicators)
+.zone-swatch {
+  display: inline-block;
+  width: $swatch-size;
+  height: $swatch-size;
+  border-radius: $swatch-radius;
+  border: $swatch-border;
+  flex-shrink: 0;
+}
+
+// Range label (auto-pushed right)
+.zone-range {
+  margin-left: auto;
+  @include secondary-text;
+}
+
+.neutral-range {
+  margin-left: auto;
+  @include secondary-text;
+}
+
+// Zone summary strips (panel 3, brightness mode)
+.zone-summary {
+  @include flex-row($spacing-sm, $spacing-xs);
+  padding: 0.35rem 0.6rem;
+  border-radius: 0.3rem;
+  font-size: $font-size-md;
+  background: var(--bs-tertiary-bg);
+}
+
+// Zone card (neutral zones)
+.zone-card {
+  margin-bottom: $spacing-sm;
+
+  .card-header {
+    padding: 0.4rem $spacing-md;
+    font-size: $font-size-md;
+    font-weight: 600;
+    @include flex-row($spacing-sm);
+  }
+
+  .card-body {
+    @include card-padding;
+  }
+}
+
+// Accordion overrides
+.accordion-button {
+  font-size: $font-size-md;
+  padding: 0.55rem $spacing-md;
+
+  .zone-range {
+    margin-left: auto;
+    margin-right: 0.4rem;
+    @include secondary-text;
+  }
+}
+
+.accordion-body {
+  @include card-padding;
+}

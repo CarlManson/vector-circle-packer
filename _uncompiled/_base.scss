@@ -1,0 +1,82 @@
+@use 'variables' as *;
+
+// Expose palette as CSS custom properties
+:root {
+  --cp-accent: #{$cp-accent};
+  --cp-accent-hover: #{$cp-accent-hover};
+  --cp-success: #{$cp-success};
+  --cp-surface: #{$cp-surface};
+  --cp-surface-alt: #{$cp-surface-alt};
+  --cp-border: #{$cp-border};
+  --cp-muted: #{$cp-muted};
+}
+
+body {
+  overflow: hidden;
+  background: $cp-surface;
+}
+
+// Cards
+.card {
+  background: $cp-surface;
+  border-color: $cp-border;
+}
+
+// Buttons
+.btn-accent {
+  background: $cp-accent;
+  color: #fff;
+  border: none;
+
+  &:hover {
+    background: $cp-accent-hover;
+    color: #fff;
+  }
+}
+
+// Header
+.app-header {
+  flex-shrink: 0;
+  border-bottom: 1px solid $cp-border;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+
+  a {
+    text-decoration: none;
+    color: inherit;
+
+    &:hover { text-decoration: none; }
+  }
+
+  .app-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0;
+    white-space: nowrap;
+
+    .app-icon {
+      color: var(--cp-accent);
+      margin-right: 0.4rem;
+    }
+  }
+}
+
+// Section label
+.section-label {
+  font-size: $font-size-section;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: $cp-muted;
+  margin-bottom: 0.35rem;
+  display: block;
+}
+
+// Form hints
+.form-hint {
+  font-size: 0.8rem;
+  color: $cp-muted;
+  margin-top: $spacing-xs;
+}

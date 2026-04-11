@@ -1,0 +1,59 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// Step navigation tabs
+.step-nav {
+  display: flex;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.step-btn {
+  flex: 1;
+  border: none;
+  background: none;
+  padding: 0.35rem 0.1rem 0.25rem;
+  font-size: $font-size-xs;
+  font-weight: 500;
+  line-height: 1.2;
+  color: var(--bs-secondary-color);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  text-align: center;
+  transition: color $transition-fast, background $transition-fast;
+
+  &:hover:not(.active) {
+    color: var(--bs-body-color);
+    background: var(--bs-tertiary-bg);
+  }
+
+  &.active {
+    color: var(--bs-primary);
+    border-bottom-color: var(--bs-primary);
+    font-weight: 700;
+  }
+
+  .step-num {
+    display: block;
+    font-size: $font-size-step-num;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.1rem;
+  }
+}
+
+// Panel content area
+.step-panel {
+  flex: 1;
+  overflow-y: auto;
+  padding: $spacing-lg;
+}
+
+// Step footer (back/next)
+.step-footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--bs-border-color);
+  padding: $spacing-sm $spacing-md;
+  @include flex-row($spacing-sm);
+}
