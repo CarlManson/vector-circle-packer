@@ -1,5 +1,17 @@
 # Changelog
 
+## [2026-04-11]
+
+### Added
+- Zone highlight in preview: opening a zone accordion on the Circles step isolates that zone, hiding all others
+- Preview footer bar with Generate/Download buttons and status text moved out of the sidebar
+- `#previewContent` wrapper with proper flexbox layout so the canvas fits the viewport
+
+### Changed
+- Preview layout reworked: canvas and SVG now size to their content instead of stretching to 100% width
+- Canvas/SVG background changed from white to transparent; added border for visibility
+- Preview uses `flex: 1; min-height: 0` instead of `height: 100%` to account for the footer
+
 ## [2026-04-07]
 
 ### Added

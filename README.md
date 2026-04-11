@@ -4,22 +4,17 @@ A browser-based tool that fills the dark areas of an uploaded image with tightly
 
 ## How it works
 
-1. Upload a PNG or JPEG image
-2. Adjust the threshold slider to control which pixels are treated as "black" (fillable area)
-3. Set a minimum and maximum circle radius
-4. Click **Start Packing**
+1. **Image** — Upload a PNG or JPEG and adjust brightness, contrast, gamma and blur
+2. **Mode** — Choose brightness or hue-based zone detection and set the number of zones
+3. **Zones** — Review zone boundaries and colour mappings
+4. **Circles** — Configure per-zone circle sizes, colours and fill mode, then generate
 
-The app scales your image to 500px wide, binarises it using the threshold, then computes a Euclidean distance transform to find the largest circle that fits at every pixel. Circles are placed greedily largest-first using a max-heap, with each placed circle updating the available space for subsequent ones. The result fills the black areas as densely as possible down to the minimum radius you specify.
+The app binarises pixels into zones, computes a Euclidean distance transform per zone, then packs circles greedily largest-first using a max-heap. Circle packing runs in a Web Worker for responsiveness.
 
-## Controls
+## Preview
 
-| Control | Description |
-|---|---|
-| Upload Image | PNG or JPEG. Scaled to 500px wide internally. |
-| Threshold | Pixels darker than this value become the fillable area. Preview updates live. |
-| Minimum Radius | Smallest circle to place (px). Lower = denser fill, slower. |
-| Maximum Radius | Largest circle allowed (px). Useful for forcing more circles into large open areas. |
+The preview panel shows a live zone map that updates as you adjust settings. On the Circles step, opening a zone accordion isolates that zone in the preview — all other zones are hidden so you can see exactly which areas are affected.
 
 ## Output
 
-The result is rendered as an SVG with black filled circles on a white background. Use the **Download SVG** button to save it.
+The result is rendered as an SVG. Use the **Download SVG** button to save it.

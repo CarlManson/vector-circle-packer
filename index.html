@@ -129,12 +129,6 @@
                 </div>
                 <div id="bgZoneContainer"></div>
             </div>
-            <hr class="my-2">
-            <div class="d-grid gap-2">
-                <button id="generateBtn" class="btn btn-primary">Generate Circles</button>
-                <button id="downloadBtn" class="btn btn-success" disabled>Download SVG</button>
-            </div>
-            <p id="status" class="text-muted small mt-2 mb-0" style="min-height:1.2em;"></p>
         </div>
 
         <!-- Step footer -->
@@ -150,8 +144,25 @@
 
 <!-- Preview -->
 <div id="preview">
-    <canvas id="previewCanvas"></canvas>
-    <svg id="outputSvg" xmlns="http://www.w3.org/2000/svg" style="display:none;"></svg>
+    <div id="previewContent">
+        <canvas id="previewCanvas"></canvas>
+        <svg id="outputSvg" xmlns="http://www.w3.org/2000/svg" style="display:none;"></svg>
+    </div>
+    <div id="previewFooter" class="p-3 bg-body border-top w-100">
+        <div class="container-fluid">
+            <div class="row align-items-center">
+                <div class="col">
+                    <p id="status" class="text-muted small mb-0" style="min-height:1.2em;"></p>
+                </div>
+                <div class="col-auto">
+                    <div class="d-flex gap-2">
+                        <button id="generateBtn" class="btn btn-primary">Generate Circles</button>
+                        <button id="downloadBtn" class="btn btn-success" disabled>Download SVG</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
