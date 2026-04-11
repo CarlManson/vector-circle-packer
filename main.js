@@ -8,6 +8,8 @@ const thresholdInput = document.getElementById('threshold');
 const thresholdVal = document.getElementById('thresholdVal');
 const generateBtn = document.getElementById('generateBtn');
 const downloadBtn = document.getElementById('downloadBtn');
+const generateBtnMobile = document.getElementById('generateBtnMobile');
+const downloadBtnMobile = document.getElementById('downloadBtnMobile');
 const statusEl = document.getElementById('status');
 
 let imageWidth = 0;
@@ -17,6 +19,15 @@ let highlightZone = null; // zone key to isolate in preview, or null for all
 // --- Performance: adjusted image cache ---
 let _adjustedCache = null;
 function invalidateAdjustedCache() { _adjustedCache = null; }
+
+function setPackingBusy(busy) {
+    generateBtn.disabled = busy;
+    if (generateBtnMobile) generateBtnMobile.disabled = busy;
+}
+function enableDownload(yes) {
+    downloadBtn.disabled = !yes;
+    if (downloadBtnMobile) downloadBtnMobile.disabled = !yes;
+}
 
 // --- Performance: rAF-based rendering debounce ---
 let _previewRaf = null;
@@ -78,7 +89,7 @@ function restoreImage() {
             ctx.drawImage(img, 0, 0);
             invalidateAdjustedCache();
             statusEl.textContent = `Image restored: ${imageWidth}×${imageHeight}px`;
-            downloadBtn.disabled = true;
+            enableDownload(false);
             // showStep will pick the right preview when setTimeout fires
             if (currentStep === 0) renderAdjustedPreview();
             else renderZonePreview();
@@ -704,6 +715,8 @@ function showStep(n) {
     document.getElementById('prevBtn').disabled = (n === 0);
     const nextBtn = document.getElementById('nextBtn');
     nextBtn.style.display = n === 3 ? 'none' : '';
+    if (generateBtnMobile) generateBtnMobile.style.display = n === 3 ? '' : 'none';
+    if (downloadBtnMobile) downloadBtnMobile.style.display = n === 3 ? '' : 'none';
     document.getElementById('stepLabel').textContent = `Step ${n + 1} of 4`;
 
     if (n === 0) {
@@ -764,6 +777,10 @@ restoreImage();
 
 // Navigate to the saved step after image may have been restored
 setTimeout(() => showStep(currentStep), 0);
+
+// --- Mobile Generate/Download (sidebar footer, step 4 only) ---
+if (generateBtnMobile) generateBtnMobile.addEventListener('click', () => generateBtn.click());
+if (downloadBtnMobile) downloadBtnMobile.addEventListener('click', () => downloadBtn.click());
 
 // --- Step nav events ---
 document.querySelectorAll('.step-btn').forEach(btn => {
@@ -871,7 +888,7 @@ imageUpload.addEventListener('change', function(e) {
             invalidateAdjustedCache();
             saveImage();
             statusEl.textContent = `Image loaded: ${imageWidth}×${imageHeight}px`;
-            downloadBtn.disabled = true;
+            enableDownload(false);
             renderAdjustedPreview();
         };
         img.src = event.target.result;
@@ -1035,8 +1052,8 @@ generateBtn.addEventListener('click', function() {
     // Cancel any in-flight packing
     if (_packingWorker) { _packingWorker.terminate(); _packingWorker = null; }
 
-    generateBtn.disabled = true;
-    downloadBtn.disabled = true;
+    setPackingBusy(true);
+    enableDownload(false);
     statusEl.textContent = "Processing...";
 
     const W = imageWidth, H = imageHeight;
@@ -1096,8 +1113,8 @@ generateBtn.addEventListener('click', function() {
         outputSvg.appendChild(fragment);
         const zoneLabel = `${n} zone${n > 1 ? 's' : ''}${bgEnabled ? ' + background' : ''}`;
         statusEl.textContent = `Done. ${totalPlaced} circles placed across ${zoneLabel}.`;
-        downloadBtn.disabled = false;
-        generateBtn.disabled = false;
+        enableDownload(true);
+        setPackingBusy(false);
     }
 
     // Try Web Worker first; fall back to main-thread packing

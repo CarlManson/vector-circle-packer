@@ -31,6 +31,13 @@
   }
 }
 
+#previewFooter {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
+
 #outputSvg,
 #previewCanvas {
   max-width: 100%;
