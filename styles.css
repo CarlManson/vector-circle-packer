@@ -110,6 +110,13 @@ body {
   justify-content: center;
   padding: 1rem;
 }
+
+#previewFooter {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+}
 #preview #outputSvg, #preview #previewCanvas {
   object-fit: contain;
 }
