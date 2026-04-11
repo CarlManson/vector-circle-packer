@@ -1,0 +1,23 @@
+@use 'variables' as *;
+
+// Flex row with centered items and consistent gap
+@mixin flex-row($gap: $spacing-sm, $mb: 0) {
+  display: flex;
+  align-items: center;
+  gap: $gap;
+  @if $mb != 0 {
+    margin-bottom: $mb;
+  }
+}
+
+// Secondary text styling used for values, ranges, labels
+@mixin secondary-text($size: $font-size-sm) {
+  font-size: $size;
+  font-weight: 400;
+  color: var(--bs-secondary-color);
+}
+
+// Compact card body padding (shared by zone-card and accordion)
+@mixin card-padding {
+  padding: 0.6rem $spacing-md;
+}

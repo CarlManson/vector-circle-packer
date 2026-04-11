@@ -1,0 +1,51 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+// Compact form rows (sliders + inputs)
+.compact-row {
+  @include flex-row($spacing-sm, 0.4rem);
+
+  label {
+    min-width: $label-min-width;
+    font-size: $font-size-label;
+    margin: 0;
+    white-space: nowrap;
+  }
+
+  .form-range {
+    flex: 1;
+  }
+
+  .val {
+    @include secondary-text;
+    min-width: $val-min-width;
+    text-align: right;
+  }
+
+  .form-control {
+    flex: 1;
+    padding: $spacing-xs $spacing-sm;
+    font-size: $font-size-md;
+  }
+}
+
+// Neutral zone threshold row
+.neutral-thresh-row {
+  @include flex-row($spacing-sm, $spacing-sm);
+
+  label {
+    min-width: $label-min-width;
+    font-size: $font-size-label;
+    margin: 0;
+  }
+
+  .form-range {
+    flex: 1;
+  }
+
+  .val {
+    @include secondary-text;
+    min-width: $val-min-width-sm;
+    text-align: right;
+  }
+}

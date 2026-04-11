@@ -1,0 +1,18 @@
+@use 'variables' as *;
+
+@media (min-width: $bp-md) {
+  #sidebar {
+    height: 100vh !important;
+    flex-shrink: 0;
+    background-color: $cp-surface !important;
+    border-right: 1px solid $cp-border !important;
+
+    .offcanvas-body {
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+      padding: 0 !important;
+      height: 100% !important;
+    }
+  }
+}
