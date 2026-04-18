@@ -1,5 +1,29 @@
 # Changelog
 
+## [2026-04-18]
+
+### Added
+- Sub-pixel centre refinement in the Web Worker — circles fit their available space more tightly
+- Draggable source-image thumbnail on steps 2–4 for on-screen reference
+- Reset button in the step 1 Adjustments section
+- Single-open accordion on step 4 (opening a zone auto-closes the previous one)
+- Warning note in hue mode when the zone count changes, since it resets angles to an even distribution
+- Worker error reporting: exceptions surface in the status bar and console instead of silently hanging
+- Fixed sidebar width so it no longer jumps between steps
+
+### Changed
+- Hue mode: Background zone removed entirely (only optional Black/White neutral zones remain)
+- Hue mode: Threshold slider now appears when White zone is off (it owns the upper luminance bound for hue zones)
+- White zone now runs up to 255 independently of the main threshold; slider max is 254
+- Zone swatch colours are computed from the source image rather than the adjusted pixels, so they reflect true zone averages
+- Hue mode preview no longer paints unclassified pixels as solid white — they are transparent
+- Hue zones now redistribute evenly when the zone count changes, rather than splitting the largest gap
+- Fallback swatches normalised to `#rrggbb` to satisfy `<input type="color">`
+
+### Fixed
+- Generate Circles hang in Hue mode caused by `getZoneSettingsFromDOM` matching the hue-wheel drag handle instead of the zone accordion item
+- "Grey background" artefact caused by the white zone previously being capped by `threshold` (128) — white zone is now decoupled from `threshold`
+
 ## [2026-04-11]
 
 ### Added

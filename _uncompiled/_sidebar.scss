@@ -3,7 +3,8 @@
 @media (min-width: $bp-md) {
   #sidebar {
     height: 100vh !important;
-    flex-shrink: 0;
+    width: $sidebar-width !important;
+    flex: 0 0 $sidebar-width;
     background-color: $cp-surface !important;
     border-right: 1px solid $cp-border !important;
 
