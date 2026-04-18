@@ -103,6 +103,36 @@ class MaxHeap {
     }
 }
 
+// Sub-pixel refinement: fit a 1D parabola along each axis to the 3-sample
+// neighbourhood of liveDist, find the vertex, and estimate the peak value.
+// Returns refined centre (xf, yf) and a radius estimate r* ≥ liveDist[idx].
+function refineCentre(liveDist, W, H, x, y) {
+    const c = liveDist[y * W + x];
+    if (x <= 0 || x >= W - 1 || y <= 0 || y >= H - 1) {
+        return { xf: x, yf: y, r: c };
+    }
+    const xm = liveDist[y * W + (x - 1)];
+    const xp = liveDist[y * W + (x + 1)];
+    const ym = liveDist[(y - 1) * W + x];
+    const yp = liveDist[(y + 1) * W + x];
+
+    let dx = 0, dy = 0, gain = 0;
+    // 1D parabola a*t^2 + b*t + c through t=-1,0,1 → a = (xm+xp-2c)/2, b = (xp-xm)/2
+    const ax2 = xm + xp - 2 * c; // 2a
+    if (ax2 < 0) { // concave-down along x → has a local max
+        dx = (xm - xp) / (2 * ax2);
+        if (dx < -0.5) dx = -0.5; else if (dx > 0.5) dx = 0.5;
+        gain += (xp - xm) * 0.5 * dx + ax2 * 0.5 * dx * dx;
+    }
+    const ay2 = ym + yp - 2 * c;
+    if (ay2 < 0) {
+        dy = (ym - yp) / (2 * ay2);
+        if (dy < -0.5) dy = -0.5; else if (dy > 0.5) dy = 0.5;
+        gain += (yp - ym) * 0.5 * dy + ay2 * 0.5 * dy * dy;
+    }
+    return { xf: x + dx, yf: y + dy, r: c + gain };
+}
+
 function packZone(binaryMap, distMap, minR, maxR, W, H) {
     const liveDist = new Float32Array(W * H);
     for (let i = 0; i < W * H; i++) liveDist[i] = binaryMap[i] ? distMap[i] : 0;
@@ -119,19 +149,20 @@ function packZone(binaryMap, distMap, minR, maxR, W, H) {
             if (currentR >= minR) heap.push({ idx, r: currentR });
             continue;
         }
-        const r = Math.min(currentR, maxR);
-        const x = idx % W;
-        const y = (idx / W) | 0;
-        if (x - r < 0 || x + r > W || y - r < 0 || y + r > H) continue;
-        placed.push({ x, y, r });
+        const xi = idx % W;
+        const yi = (idx / W) | 0;
+        const { xf, yf, r: refinedR } = refineCentre(liveDist, W, H, xi, yi);
+        const r = Math.min(refinedR, maxR);
+        if (xf - r < 0 || xf + r > W || yf - r < 0 || yf + r > H) continue;
+        placed.push({ x: xf, y: yf, r });
         const reach = r + Math.max(liveDist[idx], 1) + 1;
-        const x0 = Math.max(0, x - reach | 0), x1 = Math.min(W - 1, (x + reach) | 0);
-        const y0 = Math.max(0, y - reach | 0), y1 = Math.min(H - 1, (y + reach) | 0);
+        const x0 = Math.max(0, (xf - reach) | 0), x1 = Math.min(W - 1, (xf + reach) | 0);
+        const y0 = Math.max(0, (yf - reach) | 0), y1 = Math.min(H - 1, (yf + reach) | 0);
         for (let py = y0; py <= y1; py++) {
             for (let px = x0; px <= x1; px++) {
                 const pidx = py * W + px;
                 if (!binaryMap[pidx]) continue;
-                const dx = px - x, dy = py - y;
+                const dx = px - xf, dy = py - yf;
                 const newDist = Math.sqrt(dx * dx + dy * dy) - r;
                 if (newDist < liveDist[pidx]) {
                     liveDist[pidx] = newDist < 0 ? 0 : newDist;
@@ -180,9 +211,12 @@ function sampleGlobalColor(data, W, H, placed) {
 }
 
 self.onmessage = function(e) {
+    try {
     const { adjustedData, imgPixels, imageWidth: W, imageHeight: H, zones } = e.data;
     const allCircles = [];
     let totalPlaced = 0;
+
+    self.postMessage({ type: 'progress', message: `Starting ${zones.length} zone(s)...` });
 
     for (let i = 0; i < zones.length; i++) {
         const zone = zones[i];
@@ -217,4 +251,7 @@ self.onmessage = function(e) {
     }
 
     self.postMessage({ type: 'done', circles: allCircles, totalPlaced });
+    } catch (err) {
+        self.postMessage({ type: 'error', message: (err && err.message) || String(err), stack: err && err.stack });
+    }
 };

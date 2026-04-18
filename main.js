@@ -51,6 +51,53 @@ let _packingWorker = null;
 
 const TARGET_WIDTH = 1000;
 
+// --- Source reference thumbnail (steps 2–4) ---
+const sourceThumb = document.getElementById('sourceThumb');
+function refreshSourceThumb() {
+    if (imageWidth === 0) { sourceThumb.removeAttribute('src'); return; }
+    sourceThumb.src = hiddenCanvas.toDataURL('image/jpeg', 0.75);
+}
+function updateSourceThumb(step) {
+    const show = step > 0 && imageWidth > 0;
+    sourceThumb.classList.toggle('d-none', !show);
+    if (show && !sourceThumb.src) refreshSourceThumb();
+}
+(function wireSourceThumbDrag() {
+    let dragging = false, sx = 0, sy = 0, startLeft = 0, startTop = 0;
+    sourceThumb.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        const rect = sourceThumb.getBoundingClientRect();
+        const parentRect = sourceThumb.parentElement.getBoundingClientRect();
+        startLeft = rect.left - parentRect.left;
+        startTop = rect.top - parentRect.top;
+        sx = e.clientX; sy = e.clientY;
+        sourceThumb.style.left = `${startLeft}px`;
+        sourceThumb.style.top = `${startTop}px`;
+        sourceThumb.classList.add('dragging');
+        sourceThumb.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    sourceThumb.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        const parentRect = sourceThumb.parentElement.getBoundingClientRect();
+        const w = sourceThumb.offsetWidth, h = sourceThumb.offsetHeight;
+        let nx = startLeft + (e.clientX - sx);
+        let ny = startTop + (e.clientY - sy);
+        nx = Math.max(0, Math.min(parentRect.width - w, nx));
+        ny = Math.max(0, Math.min(parentRect.height - h, ny));
+        sourceThumb.style.left = `${nx}px`;
+        sourceThumb.style.top = `${ny}px`;
+    });
+    const end = (e) => {
+        if (!dragging) return;
+        dragging = false;
+        sourceThumb.classList.remove('dragging');
+        try { sourceThumb.releasePointerCapture(e.pointerId); } catch {}
+    };
+    sourceThumb.addEventListener('pointerup', end);
+    sourceThumb.addEventListener('pointercancel', end);
+})();
+
 // --- Persistence ---
 const SETTINGS_KEY = 'circlePackerSettings';
 const IMAGE_KEY = 'circlePackerImage';
@@ -88,6 +135,8 @@ function restoreImage() {
             hiddenCanvas.height = imageHeight;
             ctx.drawImage(img, 0, 0);
             invalidateAdjustedCache();
+            refreshSourceThumb();
+            updateSourceThumb(currentStep);
             statusEl.textContent = `Image restored: ${imageWidth}×${imageHeight}px`;
             enableDownload(false);
             // showStep will pick the right preview when setTimeout fires
@@ -131,23 +180,8 @@ function ensureHueStarts(n) {
 function resizeHueStarts(newN) {
     const current = ensureHueStarts(zoneHueStarts ? zoneHueStarts.length : newN);
     if (newN === current.length) return;
-    if (newN < current.length) {
-        zoneHueStarts = current.slice(0, newN);
-    } else {
-        const result = [...current];
-        while (result.length < newN) {
-            let maxGap = -1, maxIdx = 0;
-            for (let i = 0; i < result.length; i++) {
-                const lo = result[i], hi = result[(i + 1) % result.length];
-                const gap = hi > lo ? hi - lo : hi + 360 - lo;
-                if (gap > maxGap) { maxGap = gap; maxIdx = i; }
-            }
-            const lo = result[maxIdx], hi = result[(maxIdx + 1) % result.length];
-            const mid = hi > lo ? (lo + hi) / 2 : (lo + hi + 360) / 2 % 360;
-            result.splice(maxIdx + 1, 0, mid);
-        }
-        zoneHueStarts = result;
-    }
+    // Always redistribute evenly when the count changes; user can fine-tune in step 3.
+    zoneHueStarts = Array.from({ length: newN }, (_, i) => (i * 360 / newN));
     saveSetting('zoneHueStarts', zoneHueStarts);
 }
 
@@ -160,7 +194,7 @@ function hueToAngle(hue) { return (hue - 90) * Math.PI / 180; }
 
 function updateBgZoneVisibility() {
     const section = document.getElementById('bgZoneSection');
-    if (section) section.style.display = (zoneMode === 'hue' && whiteZoneEnabled) ? 'none' : 'block';
+    if (section) section.style.display = zoneMode === 'hue' ? 'none' : 'block';
 }
 
 function getZoneBounds(z, n, threshold) {
@@ -193,14 +227,18 @@ function updateModeUI() {
     btnB.className = `btn btn-sm ${mode === 'brightness' ? 'btn-primary' : 'btn-outline-primary'}`;
     btnH.className = `btn btn-sm ${mode === 'hue'        ? 'btn-primary' : 'btn-outline-primary'}`;
     const ts = document.getElementById('thresholdSection');
-    if (ts) ts.style.display = mode === 'hue' ? 'none' : '';
+    // In hue mode, threshold is only hidden when white zone owns the upper bound.
+    if (ts) ts.style.display = (mode === 'hue' && whiteZoneEnabled) ? 'none' : '';
     const nz = document.getElementById('neutralZoneToggles');
     if (nz) nz.classList.toggle('d-none', mode !== 'hue');
+    const hrn = document.getElementById('hueResetNote');
+    if (hrn) hrn.classList.toggle('d-none', mode !== 'hue');
     // Sync toggle checkboxes with state
     const bToggle = document.getElementById('blackZoneToggle');
     const wToggle = document.getElementById('whiteZoneToggle');
     if (bToggle) bToggle.checked = blackZoneEnabled;
     if (wToggle) wToggle.checked = whiteZoneEnabled;
+    updateBgZoneVisibility();
 }
 
 // --- Zone settings ---
@@ -281,11 +319,11 @@ function buildNeutralZonePanel(key, swatchColor, circleControls) {
     const isBlack   = key === 'black';
     const thresh    = isBlack ? blackThreshold : whiteThreshold;
     const threshold = parseInt(thresholdInput.value, 10);
-    const rangeText = isBlack ? `L: 0–${thresh}` : `L: ${thresh}–${threshold}`;
+    const rangeText = isBlack ? `L: 0–${thresh}` : `L: ${thresh}–255`;
     const swatchBg  = swatchColor || (isBlack ? '#111' : '#eee');
     const label     = isBlack ? 'Black zone' : 'White zone';
     const sliderMin = 1;
-    const sliderMax = Math.max(2, threshold - 1);
+    const sliderMax = isBlack ? Math.max(2, threshold - 1) : 254;
     const s         = getZoneSettings(key);
 
     const panel = document.createElement('div');
@@ -312,7 +350,7 @@ function buildNeutralZonePanel(key, swatchColor, circleControls) {
     threshEl.addEventListener('input', () => {
         const v = parseInt(threshEl.value, 10);
         if (isBlack) { blackThreshold = v; saveSetting('blackThreshold', v); rangeEl.textContent = `L: 0–${v}`; }
-        else         { whiteThreshold = v; saveSetting('whiteThreshold', v); rangeEl.textContent = `L: ${v}–${threshold}`; }
+        else         { whiteThreshold = v; saveSetting('whiteThreshold', v); rangeEl.textContent = `L: ${v}–255`; }
         threshValEl.textContent = v;
         if (imageWidth > 0) renderZonePreview();
     });
@@ -465,30 +503,14 @@ function setupHueWheelDrag(svgEl, n, onDrag, onDragEnd) {
     });
 }
 
-function boostToMidLuminance(hex) {
-    if (!hex) return null;
-    const r = parseInt(hex.slice(1,3), 16) / 255;
-    const g = parseInt(hex.slice(3,5), 16) / 255;
-    const b = parseInt(hex.slice(5,7), 16) / 255;
-    const max = Math.max(r,g,b), min = Math.min(r,g,b);
-    const l = (max + min) / 2;
-    const d = max - min;
-    let h = 0, s = 0;
-    if (d > 0) {
-        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-        if      (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
-        else if (max === g) h = ((b - r) / d + 2) * 60;
-        else                h = ((r - g) / d + 4) * 60;
-    }
-    const [nr, ng, nb] = hslToRgb(h, s, 0.5);
-    return rgbToHex(nr, ng, nb);
-}
-
 function computeAllSwatches(n) {
     if (imageWidth === 0) return null;
     const mode = getZoneMode();
     const threshold = parseInt(thresholdInput.value, 10);
-    const data = getAdjustedImageData().data;
+    // Zone membership is driven by adjusted luminance/hue; swatch colour
+    // is the average of the *source* pixels so zones reflect the true image.
+    const adj = getAdjustedImageData().data;
+    const src = ctx.getImageData(0, 0, imageWidth, imageHeight).data;
     const total = imageWidth * imageHeight;
     const zS = Array.from({length: n}, () => [0,0,0,0]);
     let bkS = [0,0,0,0], wS = [0,0,0,0], bgS = [0,0,0,0];
@@ -496,29 +518,29 @@ function computeAllSwatches(n) {
 
     for (let i = 0; i < total; i++) {
         const si = i * 4;
-        const r = data[si], g = data[si+1], b = data[si+2];
-        const lum = r * 0.299 + g * 0.587 + b * 0.114;
-        if (lum >= threshold) { bgS[0]+=r; bgS[1]+=g; bgS[2]+=b; bgS[3]++; continue; }
+        const ar = adj[si], ag = adj[si+1], ab = adj[si+2];
+        const sr = src[si], sg = src[si+1], sb = src[si+2];
+        const lum = ar * 0.299 + ag * 0.587 + ab * 0.114;
+        if (lum >= threshold) { bgS[0]+=sr; bgS[1]+=sg; bgS[2]+=sb; bgS[3]++; continue; }
         if (mode === 'hue') {
-            if (blackZoneEnabled && lum < blackThreshold) { bkS[0]+=r; bkS[1]+=g; bkS[2]+=b; bkS[3]++; }
-            else if (whiteZoneEnabled && lum >= whiteThreshold) { wS[0]+=r; wS[1]+=g; wS[2]+=b; wS[3]++; }
+            if (blackZoneEnabled && lum < blackThreshold) { bkS[0]+=sr; bkS[1]+=sg; bkS[2]+=sb; bkS[3]++; }
+            else if (whiteZoneEnabled && lum >= whiteThreshold) { wS[0]+=sr; wS[1]+=sg; wS[2]+=sb; wS[3]++; }
             else if (lum >= lumLo && lum < lumHi) {
-                const hue = rgbToHue(r, g, b);
+                const hue = rgbToHue(ar, ag, ab);
                 for (let z = 0; z < n; z++) {
                     const { lo, hi } = getZoneHueBounds(z, n);
                     const wraps = hi <= lo;
                     if (wraps ? (hue >= lo || hue < hi) : (hue >= lo && hue < hi)) {
-                        zS[z][0]+=r; zS[z][1]+=g; zS[z][2]+=b; zS[z][3]++; break;
+                        zS[z][0]+=sr; zS[z][1]+=sg; zS[z][2]+=sb; zS[z][3]++; break;
                     }
                 }
             }
         } else {
             const z = Math.min(n-1, Math.floor(lum * n / threshold));
-            zS[z][0]+=r; zS[z][1]+=g; zS[z][2]+=b; zS[z][3]++;
+            zS[z][0]+=sr; zS[z][1]+=sg; zS[z][2]+=sb; zS[z][3]++;
         }
     }
-    const raw = ([r,g,b,c]) => c > 0 ? rgbToHex(Math.round(r/c), Math.round(g/c), Math.round(b/c)) : null;
-    const hex = arr => boostToMidLuminance(raw(arr));
+    const hex = ([r,g,b,c]) => c > 0 ? rgbToHex(Math.round(r/c), Math.round(g/c), Math.round(b/c)) : null;
     return { zones: zS.map(hex), black: hex(bkS), white: hex(wS), bg: hex(bgS) };
 }
 
@@ -606,12 +628,13 @@ function buildPanel4() {
         let swatchColor, rangeText;
         if (mode === 'hue') {
             const { lo, hi } = getZoneHueBounds(z, n);
-            swatchColor = sw?.zones[z] || `hsl(${zoneMidHue(lo, hi).toFixed(0)},100%,50%)`;
+            const [hr, hg, hb] = hslToRgb(zoneMidHue(lo, hi), 1.0, 0.5);
+            swatchColor = sw?.zones[z] || rgbToHex(hr, hg, hb);
             rangeText = `${Math.round(lo)}°–${Math.round(hi === 0 ? 360 : hi)}°`;
         } else {
             const { lo, hi } = getZoneBounds(z, n, threshold);
             const mid = Math.round((lo + hi) / 2);
-            swatchColor = sw?.zones[z] || `rgb(${mid},${mid},${mid})`;
+            swatchColor = sw?.zones[z] || rgbToHex(mid, mid, mid);
             rangeText = `L: ${lo}–${hi}`;
         }
         const s = getZoneSettings(z);
@@ -626,16 +649,24 @@ function buildPanel4() {
             const enabled = isBlack ? blackZoneEnabled : whiteZoneEnabled;
             if (!enabled) continue;
             const lo = isBlack ? 0 : whiteThreshold;
-            const hi = isBlack ? blackThreshold : threshold;
+            const hi = isBlack ? blackThreshold : 255;
             const label = isBlack ? 'Black zone' : 'White zone';
-            const swatch = sw?.[key] || (isBlack ? '#111' : '#eee');
+            const swatch = sw?.[key] || (isBlack ? '#111111' : '#eeeeee');
             const ks = getZoneSettings(key);
             if (!getSetting(`zone_${key}_solidColor`, null)) ks.solidColor = swatch || '#000000';
             accordion.appendChild(buildZoneAccordionItem(key, label, swatch, `L: ${lo}–${hi}`, ks, false));
         }
     }
 
-    renderBgZonePanel(sw?.bg);
+    // Background zone as an accordion item (when enabled)
+    if (mode !== 'hue' && document.getElementById('bgZoneEnabled').checked) {
+        const midGray = Math.round((threshold + 255) / 2);
+        const swatch = sw?.bg || rgbToHex(midGray, midGray, midGray);
+        const bgs = getZoneSettings('bg');
+        if (!getSetting('zone_bg_solidColor', null)) bgs.solidColor = swatch;
+        accordion.appendChild(buildZoneAccordionItem('bg', 'Background', swatch, `L: ${threshold}–255`, bgs, false));
+    }
+
     updateBgZoneVisibility();
 
     // Highlight active zone in preview when an accordion item is opened
@@ -673,28 +704,16 @@ function buildZoneAccordionItem(zKey, label, swatchColor, rangeText, s, expanded
                 <span class="zone-range">${rangeText}</span>
             </button>
         </h2>
-        <div id="${colId}" class="accordion-collapse collapse${expanded ? ' show' : ''}">
+        <div id="${colId}" class="accordion-collapse collapse${expanded ? ' show' : ''}" data-bs-parent="#zonesAccordion">
             <div class="accordion-body">${zoneControlsHTML(zKey, s)}</div>
         </div>`;
     wireZoneControls(item, zKey);
     return item;
 }
 
-function renderBgZonePanel(swatchColor) {
-    const threshold = parseInt(thresholdInput.value, 10);
-    const enabled = document.getElementById('bgZoneEnabled').checked;
-    const container = document.getElementById('bgZoneContainer');
-    container.innerHTML = '';
-    if (!enabled) return;
-    const midGray = Math.round((threshold + 255) / 2);
-    const swatch = swatchColor || `rgb(${midGray},${midGray},${midGray})`;
-    const bgs = getZoneSettings('bg');
-    if (!getSetting('zone_bg_solidColor', null)) bgs.solidColor = swatch;
-    container.appendChild(buildZonePanelEl('bg', 'Background', swatch, `L: ${threshold}–255`, bgs));
-}
 
 function getZoneSettingsFromDOM(zKey) {
-    const panel = document.querySelector(`[data-zone="${zKey}"]`);
+    const panel = document.querySelector(`#zonesAccordion [data-zone="${zKey}"]`);
     if (!panel) return getZoneSettings(zKey);
     return {
         minR:      Math.max(1, parseInt(panel.querySelector('.zone-minR').value, 10) || 2),
@@ -712,6 +731,8 @@ function showStep(n) {
     if (n !== 3) highlightZone = null;
     document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('d-none', i !== n));
     document.querySelectorAll('.step-btn').forEach((b, i) => b.classList.toggle('active', i === n));
+    document.getElementById('previewFooter').classList.toggle('d-none', n !== 3);
+    updateSourceThumb(n);
     document.getElementById('prevBtn').disabled = (n === 0);
     const nextBtn = document.getElementById('nextBtn');
     nextBtn.style.display = n === 3 ? 'none' : '';
@@ -820,7 +841,7 @@ document.getElementById('blackZoneToggle').addEventListener('change', e => {
 document.getElementById('whiteZoneToggle').addEventListener('change', e => {
     whiteZoneEnabled = e.target.checked;
     saveSetting('whiteZoneEnabled', whiteZoneEnabled);
-    updateBgZoneVisibility();
+    updateModeUI();
     if (currentStep === 2) buildPanel3();
     if (currentStep === 3) buildPanel4();
     if (imageWidth > 0) renderZonePreview();
@@ -846,20 +867,20 @@ document.getElementById('numZones').addEventListener('change', e => {
     if (imageWidth > 0) renderZonePreview();
 });
 
-// --- Background zone (panel 4) ---
+// --- Background zone (panel 3 toggle) ---
 document.getElementById('bgZoneEnabled').addEventListener('change', e => {
     saveSetting('bgZoneEnabled', e.target.checked);
-    renderBgZonePanel();
     updateBgZoneVisibility();
 });
 
 // --- Image adjustment sliders (panel 1) ---
-[
-    { id: 'brightness', label: 'brightnessVal', decimals: 0 },
-    { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
-    { id: 'gamma',      label: 'gammaVal',       decimals: 2 },
-    { id: 'blur',       label: 'blurVal',        decimals: 1 },
-].forEach(({ id, label, decimals }) => {
+const ADJUSTMENTS = [
+    { id: 'brightness', label: 'brightnessVal', decimals: 0, reset: 0 },
+    { id: 'contrast',   label: 'contrastVal',   decimals: 0, reset: 0 },
+    { id: 'gamma',      label: 'gammaVal',       decimals: 2, reset: 1.0 },
+    { id: 'blur',       label: 'blurVal',        decimals: 1, reset: 0 },
+];
+ADJUSTMENTS.forEach(({ id, label, decimals }) => {
     const el = document.getElementById(id);
     const valEl = document.getElementById(label);
     el.addEventListener('input', () => {
@@ -872,6 +893,19 @@ document.getElementById('bgZoneEnabled').addEventListener('change', e => {
             else renderZonePreview();
         });
     });
+});
+
+document.getElementById('resetAdjustmentsBtn').addEventListener('click', () => {
+    ADJUSTMENTS.forEach(({ id, label, decimals, reset }) => {
+        const el = document.getElementById(id);
+        el.value = reset;
+        document.getElementById(label).textContent = reset.toFixed(decimals);
+        saveSetting(id, String(reset));
+    });
+    invalidateAdjustedCache();
+    if (imageWidth === 0) return;
+    if (currentStep === 0) renderAdjustedPreview();
+    else renderZonePreview();
 });
 
 imageUpload.addEventListener('change', function(e) {
@@ -887,6 +921,8 @@ imageUpload.addEventListener('change', function(e) {
             ctx.drawImage(img, 0, 0, imageWidth, imageHeight);
             invalidateAdjustedCache();
             saveImage();
+            refreshSourceThumb();
+            updateSourceThumb(currentStep);
             statusEl.textContent = `Image loaded: ${imageWidth}×${imageHeight}px`;
             enableDownload(false);
             renderAdjustedPreview();
@@ -942,7 +978,7 @@ function renderZonePreview() {
     const threshold = parseInt(thresholdInput.value, 10);
     const n = parseInt(document.getElementById('numZones').value, 10) || 1;
     const mode = getZoneMode();
-    const bgEnabled = document.getElementById('bgZoneEnabled').checked;
+    const bgEnabled = mode !== 'hue' && document.getElementById('bgZoneEnabled').checked;
     const total = imageWidth * imageHeight;
 
     // Only highlight when on the Circles panel (step 3)
@@ -976,7 +1012,6 @@ function renderZonePreview() {
             const [cr, cg, cb] = hslToRgb(zoneMidHue(lo, hi), 1.0, 0.5);
             zoneR[z] = cr; zoneG[z] = cg; zoneB[z] = cb;
         }
-        const bgGray = bgEnabled ? Math.round((threshold + 255) / 2) : 255;
         const useBk = blackZoneEnabled, useWh = whiteZoneEnabled;
         const bkTh = blackThreshold, whTh = whiteThreshold;
 
@@ -984,10 +1019,8 @@ function renderZonePreview() {
             const si = i * 4;
             const r = data[si], g = data[si + 1], b = data[si + 2];
             const lum = r * 0.299 + g * 0.587 + b * 0.114;
-            let pr, pg, pb, zoneTag;
-            if (lum >= threshold) {
-                pr = pg = pb = bgGray; zoneTag = 'bg';
-            } else if (useBk && lum < bkTh) {
+            let pr = 0, pg = 0, pb = 0, zoneTag = 'none';
+            if (useBk && lum < bkTh) {
                 pr = pg = pb = 20; zoneTag = 'black';
             } else if (useWh && lum >= whTh) {
                 pr = pg = pb = 235; zoneTag = 'white';
@@ -1001,14 +1034,11 @@ function renderZonePreview() {
                     if (inZone) { zi = z; break; }
                 }
                 pr = zoneR[zi]; pg = zoneG[zi]; pb = zoneB[zi]; zoneTag = zi;
-            } else {
-                pr = pg = pb = 255; zoneTag = 'none';
             }
-            const active = hl === null
+            const active = zoneTag !== 'none' && (hl === null
                 || (hlIsNum && zoneTag === hlIdx)
-                || (hlIsBg && zoneTag === 'bg')
                 || (hlIsBlack && zoneTag === 'black')
-                || (hlIsWhite && zoneTag === 'white');
+                || (hlIsWhite && zoneTag === 'white'));
             out[si] = pr; out[si + 1] = pg; out[si + 2] = pb;
             out[si + 3] = active ? 255 : dimAlpha;
         }
@@ -1085,11 +1115,11 @@ generateBtn.addEventListener('click', function() {
             if (!(isBlack ? blackZoneEnabled : whiteZoneEnabled)) continue;
             const zs = getZoneSettingsFromDOM(key);
             const minR = Math.max(1, zs.minR), maxR = Math.max(minR, zs.maxR);
-            zones.push({ type: 'brightness', lo: isBlack ? 0 : whiteThreshold, hi: isBlack ? blackThreshold : threshold,
+            zones.push({ type: 'brightness', lo: isBlack ? 0 : whiteThreshold, hi: isBlack ? blackThreshold : 256,
                          minR, maxR, colorMode: zs.colorMode, solidColor: zs.solidColor, label: `${isBlack ? 'Black' : 'White'} zone` });
         }
     }
-    if (bgEnabled) {
+    if (mode !== 'hue' && bgEnabled) {
         const zs = getZoneSettingsFromDOM('bg');
         const minR = Math.max(1, zs.minR), maxR = Math.max(minR, zs.maxR);
         zones.push({ type: 'brightness', lo: threshold, hi: 256, minR, maxR, colorMode: zs.colorMode, solidColor: zs.solidColor, label: 'Background zone' });
@@ -1129,14 +1159,25 @@ generateBtn.addEventListener('click', function() {
                 _packingWorker = null;
                 worker.terminate();
                 renderResult(ev.data.circles, ev.data.totalPlaced);
+            } else if (ev.data.type === 'error') {
+                console.error('Worker threw:', ev.data.message, ev.data.stack);
+                _packingWorker = null;
+                worker.terminate();
+                statusEl.textContent = `Worker error: ${ev.data.message}`;
+                generateBtn.disabled = false;
             }
         };
 
         worker.onerror = function(err) {
-            // Worker failed (e.g. file:// protocol) — fall back
+            console.error('Worker error:', err.message || err, err.filename, err.lineno);
             _packingWorker = null;
             worker.terminate();
+            statusEl.textContent = `Worker error: ${err.message || 'unknown'} — falling back`;
             packCirclesFallback(adjustedData, imgPixels, W, H, n, threshold, mode, bgEnabled, zones, renderResult);
+        };
+        worker.onmessageerror = function(err) {
+            console.error('Worker messageerror:', err);
+            statusEl.textContent = 'Worker message error — see console';
         };
 
         const adjCopy = new Uint8ClampedArray(adjustedData);
@@ -1441,7 +1482,7 @@ function packCircles() {
             const zs   = getZoneSettingsFromDOM(key);
             const minR = Math.max(1, zs.minR), maxR = Math.max(minR, zs.maxR);
             const lo   = isBlack ? 0 : whiteThreshold;
-            const hi   = isBlack ? blackThreshold : threshold;
+            const hi   = isBlack ? blackThreshold : 256;
             statusEl.textContent = `${isBlack ? 'Black' : 'White'} zone: packing...`;
             const bm   = buildZoneBinaryMap(adjustedData, lo, hi);
             const dm   = buildDistanceMap(bm);
