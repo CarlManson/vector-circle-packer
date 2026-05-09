@@ -26,6 +26,25 @@
   }
 }
 
+#previewPlaceholder {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  pointer-events: none;
+  transition: background 0.15s;
+
+  &.drag-over {
+    background: rgba(109, 124, 229, 0.08);
+    outline: 2px dashed var(--cp-accent);
+    outline-offset: -12px;
+    border-radius: 8px;
+  }
+}
+
 #previewFooter {
   flex-shrink: 0;
   position: sticky;

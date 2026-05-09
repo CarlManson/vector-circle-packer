@@ -8,6 +8,10 @@
   --cp-muted: #8888a0;
 }
 
+html, body {
+  height: 100%;
+}
+
 body {
   overflow: hidden;
   background: #1e1e2e;
@@ -128,6 +132,24 @@ body {
 }
 #preview #outputSvg, #preview #previewCanvas {
   object-fit: contain;
+}
+
+#previewPlaceholder {
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  pointer-events: none;
+  transition: background 0.15s;
+}
+#previewPlaceholder.drag-over {
+  background: rgba(109, 124, 229, 0.08);
+  outline: 2px dashed var(--cp-accent);
+  outline-offset: -12px;
+  border-radius: 8px;
 }
 
 #previewFooter {
@@ -533,7 +555,7 @@ body.landing-page {
   border-top: 1px solid #3a3a50;
   color: #8888a0;
   font-size: 0.85rem;
-  padding: 2rem 0;
+  padding: 0.75rem 0;
 }
 .lp-footer a {
   color: #6d7ce5;

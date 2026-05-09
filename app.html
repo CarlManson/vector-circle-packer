@@ -36,6 +36,10 @@
         <a href="https://halftoner.carlmanson.au/" class="ms-auto text-muted small text-decoration-none d-none d-md-inline" target="_blank" rel="noopener">
             <i class="bi bi-grid-3x3-gap-fill me-1" style="font-size:0.75rem;"></i>Vector Halftoner
         </a>
+        <div class="vr d-none d-md-block opacity-25"></div>
+        <button id="navKofiBtn" class="btn btn-sm d-none d-md-inline-flex align-items-center" style="background:rgb(252,191,71);color:#fff;border:none;" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Buy Me a Coffee">
+            <i class="bi bi-cup-hot" style="font-size:0.85rem;"></i>
+        </button>
     </div>
 </header>
 
@@ -66,7 +70,7 @@
             <p class="step-hint">Upload your image. Bump the contrast or gamma if the tones aren't well-separated — it'll help the zones work better. Blur will help eliminate sections too small or noisy for circles to fit.</p>
             <div class="mb-3">
                 <label class="section-label">Image</label>
-                <input type="file" id="imageUpload" class="form-control form-control-sm" accept="image/png,image/jpeg">
+                <input type="file" id="imageUpload" class="form-control form-control-sm" accept="image/png,image/jpeg,image/avif,image/webp,image/gif">
             </div>
             <div>
                 <div class="section-label d-flex align-items-center justify-content-between">
@@ -181,7 +185,11 @@
 <!-- Preview -->
 <div id="preview">
     <div id="previewContent">
-        <canvas id="previewCanvas"></canvas>
+        <div id="previewPlaceholder" class="text-center text-muted">
+            <i class="bi bi-image" style="font-size:3rem; opacity:0.25;"></i>
+            <p class="mt-2 mb-0 small">Upload or drag an image to get started</p>
+        </div>
+        <canvas id="previewCanvas" style="display:none;"></canvas>
         <svg id="outputSvg" xmlns="http://www.w3.org/2000/svg" style="display:none;"></svg>
     </div>
     <img id="sourceThumb" class="d-none" alt="Source reference" draggable="false"
@@ -204,6 +212,58 @@
 </div><!-- /#preview -->
 
 </div><!-- /#appBody -->
+
+<!-- Footer -->
+<footer class="lp-footer flex-shrink-0">
+    <div class="container text-center">
+        <p class="mb-0">&copy; 2026 Carl Manson &middot; Made in Australia &middot; Your images never leave your browser &middot; <a href="privacy.html">Privacy policy</a></p>
+    </div>
+</footer>
+
+<!-- Support Modal -->
+<div class="modal fade" id="supportModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="background:var(--cp-surface); border:1px solid var(--cp-border);">
+            <div class="modal-body text-center p-4">
+                <i class="bi bi-check-circle fs-1 d-block mb-3" style="color:var(--cp-accent);"></i>
+                <h5 class="fw-bold mb-2">Your SVG is ready!</h5>
+                <p class="text-muted mb-3">Use it however you like. If you find this tool helpful, consider chucking a few bucks towards my web hosting and coffee fund.</p>
+                <div class="d-flex gap-3 justify-content-center mb-3">
+                    <button class="btn btn-primary" id="showKofiBtn">
+                        <i class="bi bi-cup-hot me-2"></i>Buy me a coffee
+                    </button>
+                    <button class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                        Nah, I'm good. Cheers.
+                    </button>
+                </div>
+                <div class="form-check d-inline-flex align-items-center gap-2">
+                    <input class="form-check-input" type="checkbox" id="alreadyDonated">
+                    <label class="form-check-label small text-muted" for="alreadyDonated" style="cursor:pointer;">
+                        I already did, I swear! <span style="font-size:0.75rem;">(don't show this again)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ko-fi Modal -->
+<div class="modal fade" id="kofiModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered" style="max-width:420px;">
+        <div class="modal-content" style="background:var(--cp-surface); border:1px solid var(--cp-border);">
+            <div class="modal-body p-4">
+                <div class="text-center mb-3">
+                    <h5 class="fw-bold mb-1">Thanks for the support!</h5>
+                    <p class="small mb-0" style="color:var(--cp-muted);">Helps keep the lights on and the coffee flowing.</p>
+                </div>
+                <iframe src="https://ko-fi.com/carlmanson/?hidefeed=true&widget=true&embed=true&preview=true" style="border:none;width:100%;border-radius:0.5rem;" height="712" title="Support Carl on Ko-fi"></iframe>
+                <div class="text-center mt-2">
+                    <button class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="main.js"></script>
