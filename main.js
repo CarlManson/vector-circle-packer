@@ -782,6 +782,7 @@ function loadSettings() {
             { id: 'contrast',   label: 'contrastVal',   decimals: 0 },
             { id: 'gamma',      label: 'gammaVal',       decimals: 2 },
             { id: 'blur',       label: 'blurVal',        decimals: 1 },
+            { id: 'saturation', label: 'saturationVal',  decimals: 0 },
         ].forEach(({ id, label, decimals }) => {
             if (s[id] !== undefined) {
                 document.getElementById(id).value = s[id];
@@ -879,6 +880,7 @@ const ADJUSTMENTS = [
     { id: 'contrast',   label: 'contrastVal',   decimals: 0, reset: 0 },
     { id: 'gamma',      label: 'gammaVal',       decimals: 2, reset: 1.0 },
     { id: 'blur',       label: 'blurVal',        decimals: 1, reset: 0 },
+    { id: 'saturation', label: 'saturationVal',  decimals: 0, reset: 0 },
 ];
 ADJUSTMENTS.forEach(({ id, label, decimals }) => {
     const el = document.getElementById(id);
@@ -946,6 +948,7 @@ function getAdjustedImageData() {
     const bright = parseInt(document.getElementById('brightness').value, 10) || 0;
     const contr  = parseInt(document.getElementById('contrast').value, 10) || 0;
     const gamma  = parseFloat(document.getElementById('gamma').value) || 1.0;
+    const sat    = parseInt(document.getElementById('saturation').value, 10) || 0;
 
     const tmpCanvas = document.createElement('canvas');
     tmpCanvas.width = imageWidth;
@@ -959,6 +962,7 @@ function getAdjustedImageData() {
     const contrastFactor = (259 * (contr * 2.55 + 255)) / (255 * (259 - contr * 2.55));
     const gammaInv = 1 / gamma;
 
+    const satFactor = (100 + sat) / 100;
     for (let i = 0; i < data.length; i += 4) {
         for (let c = 0; c < 3; c++) {
             let v = data[i + c];
@@ -966,6 +970,12 @@ function getAdjustedImageData() {
             v = contrastFactor * (v - 128) + 128;
             v = 255 * Math.pow(Math.max(0, v) / 255, gammaInv);
             data[i + c] = Math.max(0, Math.min(255, v + 0.5)) | 0;
+        }
+        if (sat !== 0) {
+            const gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+            for (let c = 0; c < 3; c++) {
+                data[i + c] = Math.max(0, Math.min(255, (gray + (data[i + c] - gray) * satFactor) + 0.5)) | 0;
+            }
         }
     }
     _adjustedCache = imageData;

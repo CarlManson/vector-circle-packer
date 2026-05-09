@@ -73,6 +73,18 @@ body {
   min-height: 0;
 }
 
+// Step panel explainer
+.step-hint {
+  font-size: 0.72rem;
+  color: $cp-muted;
+  line-height: 1.45;
+  background: $cp-surface-alt;
+  border: 1px solid $cp-border;
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
 // Section label
 .section-label {
   font-size: $font-size-section;

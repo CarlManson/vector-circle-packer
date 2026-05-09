@@ -63,6 +63,17 @@ body {
   min-height: 0;
 }
 
+.step-hint {
+  font-size: 0.72rem;
+  color: #8888a0;
+  line-height: 1.45;
+  background: #2a2a3d;
+  border: 1px solid #3a3a50;
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
 .section-label {
   font-size: 0.7rem;
   font-weight: 700;
