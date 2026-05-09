@@ -59,6 +59,7 @@
 
         <!-- Panel 1: Image & Adjustments -->
         <div class="step-panel" id="panel0">
+            <p class="step-hint">Upload your image. Bump the contrast or gamma if the tones aren't well-separated — it'll help the zones work better.</p>
             <div class="mb-3">
                 <label class="section-label">Image</label>
                 <input type="file" id="imageUpload" class="form-control form-control-sm" accept="image/png,image/jpeg">
@@ -88,11 +89,17 @@
                     <input type="range" id="blur" class="form-range" min="0" max="20" step="0.5" value="0">
                     <span class="val" id="blurVal">0</span>
                 </div>
+                <div class="compact-row">
+                    <label>Saturation</label>
+                    <input type="range" id="saturation" class="form-range" min="-100" max="100" value="0">
+                    <span class="val" id="saturationVal">0</span>
+                </div>
             </div>
         </div>
 
         <!-- Panel 2: Mode & Zones setup -->
         <div class="step-panel d-none" id="panel1">
+            <p class="step-hint">Choose how to divide your image into zones. Brightness mode splits by luminance — works for most images. Hue mode splits by colour, better for illustrations.</p>
             <div class="mb-3">
                 <div class="section-label">Zone Mode</div>
                 <div class="btn-group w-100" id="modeToggle" role="group">
@@ -129,10 +136,12 @@
         <div class="step-panel d-none" id="panel2">
             <!-- Brightness: zone summary strips -->
             <div id="panel2Brightness">
+            <p class="step-hint">Drag the handles to set each zone's luminance range. The preview updates live — adjust until each zone captures the right area.</p>
                 <div id="zoneSummaryContainer"></div>
             </div>
             <!-- Hue: colour wheel + neutral zones -->
             <div id="panel2Hue" class="d-none">
+            <p class="step-hint">Drag the handles on the colour wheel to set each zone's hue range. The preview highlights which pixels fall into each zone.</p>
                 <div id="hueWheelContainer"></div>
                 <div id="blackZoneContainer"></div>
                 <div id="whiteZoneContainer"></div>
@@ -147,6 +156,7 @@
 
         <!-- Panel 4: Circle Config -->
         <div class="step-panel d-none" id="panel3">
+            <p class="step-hint">Set min and max circle size per zone. Open a zone to isolate it in the preview. Choose per-circle colour sampling, a flat zone colour, or pick your own.</p>
             <div class="accordion accordion-flush border rounded" id="zonesAccordion"></div>
         </div>
 
