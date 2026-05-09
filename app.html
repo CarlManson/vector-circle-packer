@@ -40,6 +40,9 @@
         <button id="navKofiBtn" class="btn btn-sm d-none d-md-inline-flex align-items-center" style="background:rgb(252,191,71);color:#fff;border:none;" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Buy Me a Coffee">
             <i class="bi bi-cup-hot" style="font-size:0.85rem;"></i>
         </button>
+        <button id="helpBtn" class="btn btn-sm btn-outline-secondary d-none d-md-inline-flex align-items-center" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Help">
+            <i class="bi bi-question-lg" style="font-size:0.85rem;"></i>
+        </button>
     </div>
 </header>
 
@@ -166,6 +169,11 @@
         <div class="step-panel d-none" id="panel3">
             <p class="step-hint">Set min and max circle size per zone. Open a zone to isolate it in the preview. Choose per-circle colour sampling, a flat zone colour, or pick your own.</p>
             <div class="accordion accordion-flush border rounded" id="zonesAccordion"></div>
+            <div class="d-grid gap-2 mt-3">
+                <button id="generateBtn" class="btn btn-primary btn-sm">Generate Circles</button>
+                <button id="downloadBtn" class="btn btn-success btn-sm" disabled>Download SVG</button>
+            </div>
+            <p id="status" class="text-muted small mt-2 mb-0" style="min-height:1.2em;"></p>
         </div>
 
         <!-- Step footer -->
@@ -174,9 +182,6 @@
             <button id="prevBtn" class="btn btn-outline-secondary btn-sm" disabled>← Back</button>
             <span id="stepLabel" class="text-muted small mx-auto">Step 1 of 4</span>
             <button id="nextBtn" class="btn btn-primary btn-sm">Next →</button>
-            <!-- Mobile only: Generate/Download visible in sidebar on step 4 -->
-            <button id="generateBtnMobile" class="btn btn-primary btn-sm d-md-none" style="display:none">Generate</button>
-            <button id="downloadBtnMobile" class="btn btn-success btn-sm d-md-none" style="display:none" disabled>↓ SVG</button>
         </div>
 
     </div><!-- /offcanvas-body -->
@@ -194,21 +199,6 @@
     </div>
     <img id="sourceThumb" class="d-none" alt="Source reference" draggable="false"
          style="position:absolute; top:1rem; left:1rem; width:160px; height:auto; max-height:40vh; object-fit:contain; border-radius:.375rem; border:1px solid var(--bs-border-color); box-shadow:0 .5rem 1rem rgba(0,0,0,.15); background:var(--bs-body-bg); cursor:grab; user-select:none; z-index:10;">
-    <div id="previewFooter" class="d-none p-3 bg-body border-top w-100">
-        <div class="container-fluid">
-            <div class="row align-items-center">
-                <div class="col">
-                    <p id="status" class="text-muted small mb-0" style="min-height:1.2em;"></p>
-                </div>
-                <div class="col-auto">
-                    <div class="d-flex gap-2">
-                        <button id="generateBtn" class="btn btn-primary">Generate Circles</button>
-                        <button id="downloadBtn" class="btn btn-success" disabled>Download SVG</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 </div><!-- /#preview -->
 
 </div><!-- /#appBody -->
@@ -219,6 +209,75 @@
         <p class="mb-0">&copy; 2026 Carl Manson &middot; Made in Australia &middot; Your images never leave your browser &middot; <a href="privacy.html">Privacy policy</a></p>
     </div>
 </footer>
+
+<!-- Help Modal -->
+<div class="modal fade" id="helpModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content" style="background:var(--cp-surface); border:1px solid var(--cp-border);">
+            <div class="modal-header border-bottom" style="border-color:var(--cp-border) !important;">
+                <h5 class="modal-title fw-bold">How to use Vector Circle Packer</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 help-modal-body">
+
+                <h6 class="help-section-heading">The basic flow</h6>
+                <p>Upload an image, choose how to divide it into zones, configure each zone's circle sizes and colours, then hit Generate. Download the SVG when you're happy with it. That's the whole thing.</p>
+
+                <hr class="help-divider">
+
+                <h6 class="help-section-heading">Step 1 — Image</h6>
+                <p>Upload a JPEG, PNG, WebP, AVIF or GIF. You can also drag an image directly onto the preview area. The image is scaled down internally for performance — the SVG output is vector so it'll scale to any size.</p>
+                <p>The adjustment sliders let you prep the image before the tool analyses it:</p>
+                <ul>
+                    <li><strong>Brightness / Contrast</strong> — widen the tonal spread so zones are better separated.</li>
+                    <li><strong>Gamma</strong> — pull detail out of shadows (below 1.0) or compress highlights (above 1.0).</li>
+                    <li><strong>Saturation</strong> — boost colours before switching to Hue mode, or desaturate before Brightness mode.</li>
+                    <li><strong>Blur</strong> — smooth out noise or fine texture. Noisy areas produce tiny circles that don't pack well — a small blur helps a lot.</li>
+                </ul>
+                <p>Hit Reset (next to the slider label) to restore all adjustments to zero.</p>
+
+                <hr class="help-divider">
+
+                <h6 class="help-section-heading">Step 2 — Mode</h6>
+                <p>This is the most important choice. Pick the wrong mode and the zones won't make sense for your image.</p>
+
+                <p><strong>Brightness mode</strong> splits the image by luminance — how light or dark each pixel is. Use this when the areas you want to treat differently have different tones. Most images work best here. Good for: portraits, logos, text, silhouettes, anything in black and white, anything where darker areas should have more or smaller circles than lighter areas. The threshold slider lets you exclude the background — pixels above the threshold value are treated as white/empty and excluded from packing.</p>
+
+                <p><strong>Hue mode</strong> splits the image by colour. Use this when the areas you want to treat differently have different hues, not just different brightness levels. Good for: colourful illustrations, flags, charts, images with bold distinct colours — red areas, blue areas, green areas and so on. It doesn't work well on photos where colours blend into each other or on greyscale images. In Hue mode you get optional Black and White zones to catch near-neutral pixels that don't have a clear hue.</p>
+
+                <p>A quick rule of thumb: if you'd describe your image by its tones ("the dark bit", "the light background"), use Brightness. If you'd describe it by its colours ("the red section", "the blue sky"), use Hue.</p>
+
+                <p>Set the number of zones here too. More zones means more control but more configuration in the next steps. Start with 2 and add more if you need finer control.</p>
+
+                <hr class="help-divider">
+
+                <h6 class="help-section-heading">Step 3 — Zones</h6>
+                <p>Configure the boundaries of each zone. The preview updates live.</p>
+                <p>In <strong>Brightness mode</strong>: each zone shows as a horizontal strip representing a luminance range. Drag the handles to move the boundaries. The preview colours each pixel according to its zone so you can see exactly what's captured.</p>
+                <p>In <strong>Hue mode</strong>: drag the handles on the colour wheel to set each zone's hue range. Zones cover a sweep of the wheel — widen or narrow the arc to include more or fewer hues. If your image has a limited palette, move the handles close together around those specific hues.</p>
+                <p>The Background zone (brightness mode) captures everything above the threshold — usually the white background. Enable it if you want circles in the background too.</p>
+
+                <hr class="help-divider">
+
+                <h6 class="help-section-heading">Step 4 — Circles</h6>
+                <p>Set the min and max circle radius for each zone. The packer places circles largest-first, so the max size determines the biggest circles that'll appear; the min is the smallest it'll bother with before moving on.</p>
+                <p>Clicking a zone's header in the list isolates that zone in the preview so you can see exactly what area it covers.</p>
+                <p>Colour options per zone:</p>
+                <ul>
+                    <li><strong>Sample from image</strong> — each circle takes the colour of the pixel underneath it. Gives a naturalistic result.</li>
+                    <li><strong>Flat zone colour</strong> — all circles in the zone use the same colour, picked from the image's average for that zone. Good for a graphic, reduced-palette look.</li>
+                    <li><strong>Custom colour</strong> — pick any colour you like.</li>
+                </ul>
+                <p>Hit <strong>Generate Circles</strong> to run the packer. It runs in a background thread so the page stays responsive. Large images with many small circles take longer. Hit Generate again at any time to re-run with updated settings.</p>
+                <p>When you're happy, hit <strong>Download SVG</strong>. The file opens cleanly in Illustrator, Figma, Affinity Designer, and Inkscape.</p>
+
+            </div>
+            <div class="modal-footer border-top" style="border-color:var(--cp-border) !important;">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Support Modal -->
 <div class="modal fade" id="supportModal" tabindex="-1">

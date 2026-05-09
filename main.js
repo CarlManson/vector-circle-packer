@@ -8,8 +8,6 @@ const thresholdInput = document.getElementById('threshold');
 const thresholdVal = document.getElementById('thresholdVal');
 const generateBtn = document.getElementById('generateBtn');
 const downloadBtn = document.getElementById('downloadBtn');
-const generateBtnMobile = document.getElementById('generateBtnMobile');
-const downloadBtnMobile = document.getElementById('downloadBtnMobile');
 const statusEl = document.getElementById('status');
 
 // --- Bootstrap tooltips ---
@@ -28,6 +26,9 @@ document.getElementById('showKofiBtn').addEventListener('click', function() {
 document.getElementById('navKofiBtn').addEventListener('click', function() {
     bootstrap.Modal.getOrCreateInstance(document.getElementById('kofiModal')).show();
 });
+document.getElementById('helpBtn').addEventListener('click', function() {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('helpModal')).show();
+});
 document.getElementById('alreadyDonated').addEventListener('change', function() {
     if (this.checked) {
         localStorage.setItem(CP_DONATED_KEY, 'true');
@@ -45,11 +46,9 @@ function invalidateAdjustedCache() { _adjustedCache = null; }
 
 function setPackingBusy(busy) {
     generateBtn.disabled = busy;
-    if (generateBtnMobile) generateBtnMobile.disabled = busy;
 }
 function enableDownload(yes) {
     downloadBtn.disabled = !yes;
-    if (downloadBtnMobile) downloadBtnMobile.disabled = !yes;
 }
 
 // --- Performance: rAF-based rendering debounce ---
@@ -757,13 +756,10 @@ function showStep(n) {
     if (n !== 3) highlightZone = null;
     document.querySelectorAll('.step-panel').forEach((p, i) => p.classList.toggle('d-none', i !== n));
     document.querySelectorAll('.step-btn').forEach((b, i) => b.classList.toggle('active', i === n));
-    document.getElementById('previewFooter').classList.toggle('d-none', n !== 3);
     updateSourceThumb(n);
     document.getElementById('prevBtn').disabled = (n === 0);
     const nextBtn = document.getElementById('nextBtn');
     nextBtn.style.display = n === 3 ? 'none' : '';
-    if (generateBtnMobile) generateBtnMobile.style.display = n === 3 ? '' : 'none';
-    if (downloadBtnMobile) downloadBtnMobile.style.display = n === 3 ? '' : 'none';
     document.getElementById('stepLabel').textContent = `Step ${n + 1} of 4`;
 
     if (n === 0) {
@@ -827,8 +823,6 @@ restoreImage();
 setTimeout(() => showStep(currentStep), 0);
 
 // --- Mobile Generate/Download (sidebar footer, step 4 only) ---
-if (generateBtnMobile) generateBtnMobile.addEventListener('click', () => generateBtn.click());
-if (downloadBtnMobile) downloadBtnMobile.addEventListener('click', () => downloadBtn.click());
 
 // --- Step nav events ---
 document.querySelectorAll('.step-btn').forEach(btn => {
@@ -1048,7 +1042,7 @@ function renderZonePreview() {
     const hlIsBg = hl === 'bg';
     const hlIsBlack = hl === 'black';
     const hlIsWhite = hl === 'white';
-    const dimAlpha = 0; // fully hide non-highlighted zones
+    const ghostAlpha = 35; // adjusted image opacity behind highlighted zone
 
     previewCanvas.width = imageWidth;
     previewCanvas.height = imageHeight;
@@ -1098,8 +1092,13 @@ function renderZonePreview() {
                 || (hlIsNum && zoneTag === hlIdx)
                 || (hlIsBlack && zoneTag === 'black')
                 || (hlIsWhite && zoneTag === 'white'));
-            out[si] = pr; out[si + 1] = pg; out[si + 2] = pb;
-            out[si + 3] = active ? 255 : dimAlpha;
+            if (active) {
+                out[si] = pr; out[si + 1] = pg; out[si + 2] = pb; out[si + 3] = 255;
+            } else if (hl !== null) {
+                out[si] = data[si]; out[si + 1] = data[si + 1]; out[si + 2] = data[si + 2]; out[si + 3] = ghostAlpha;
+            } else {
+                out[si] = pr; out[si + 1] = pg; out[si + 2] = pb; out[si + 3] = 0;
+            }
         }
     } else {
         // Brightness mode — pre-compute zone grays
@@ -1124,8 +1123,13 @@ function renderZonePreview() {
             const active = hl === null
                 || (hlIsNum && zi === hlIdx)
                 || (hlIsBg && zi === -1);
-            out[si] = v; out[si + 1] = v; out[si + 2] = v;
-            out[si + 3] = active ? 255 : dimAlpha;
+            if (active) {
+                out[si] = v; out[si + 1] = v; out[si + 2] = v; out[si + 3] = 255;
+            } else if (hl !== null) {
+                out[si] = data[si]; out[si + 1] = data[si + 1]; out[si + 2] = data[si + 2]; out[si + 3] = ghostAlpha;
+            } else {
+                out[si] = v; out[si + 1] = v; out[si + 2] = v; out[si + 3] = 0;
+            }
         }
     }
 

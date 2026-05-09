@@ -203,6 +203,29 @@ body.landing-page {
   }
 }
 
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+
+.lp-faq {
+  .accordion-item {
+    background: transparent;
+    border-color: $cp-border;
+  }
+  .accordion-button {
+    background: transparent;
+    color: var(--bs-body-color);
+    font-weight: 600;
+    font-size: 0.95rem;
+    &:not(.collapsed) { color: $cp-accent; box-shadow: none; background: transparent; }
+    &::after { filter: invert(1) brightness(0.6); }
+    &:focus { box-shadow: none; }
+  }
+  .accordion-body {
+    font-size: 0.9rem;
+    line-height: 1.6;
+    a { color: $cp-accent; text-decoration: none; &:hover { text-decoration: underline; } }
+  }
+}
+
 // ── Footer ───────────────────────────────────────────────────────────────────
 
 .lp-footer {

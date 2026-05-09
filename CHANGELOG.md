@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-05-09]
+
+### Added
+- Preview placeholder with drag-and-drop: empty preview shows an upload prompt; dragging an image file onto it loads the image
+- Ko-fi support modal fires after downloading SVG (suppressed if user checks "I already did")
+- Navbar coffee button opens Ko-fi embed directly
+- Help modal (? button in navbar) with full usage instructions including Brightness vs Hue mode guidance
+- Ghost source image in zone preview: when a zone is isolated on the Circles step, the adjusted source image shows at low opacity behind the highlighted zone for context
+- FAQ section on landing page targeting common search terms (Ishihara, stippling, petri dish, halftone comparison)
+- Single-line footer on both landing and app pages
+
+### Changed
+- Generate Circles and Download SVG buttons moved into the step 4 sidebar panel; preview footer removed
+- File input now accepts AVIF, WebP and GIF in addition to PNG and JPEG
+- Page title and meta updated to include bubble art, Ishihara and stippling keywords
+- Footer condensed to a single line with · separators on both pages
+
+### Fixed
+- CNAME file added to repo so custom domain survives future pushes
+
 ## [2026-04-18]
 
 ### Added
