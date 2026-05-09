@@ -63,6 +63,16 @@ body {
   }
 }
 
+// App nav (top bar)
+#appNav {
+  background: $cp-surface;
+  border-color: $cp-border !important;
+}
+
+#appBody {
+  min-height: 0;
+}
+
 // Section label
 .section-label {
   font-size: $font-size-section;
