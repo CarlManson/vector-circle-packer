@@ -12,6 +12,29 @@ const generateBtnMobile = document.getElementById('generateBtnMobile');
 const downloadBtnMobile = document.getElementById('downloadBtnMobile');
 const statusEl = document.getElementById('status');
 
+// --- Bootstrap tooltips ---
+document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+
+// --- Ko-fi support modal ---
+const CP_DONATED_KEY = 'cp_donated';
+function showSupportModal() {
+    if (localStorage.getItem(CP_DONATED_KEY)) return;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('supportModal')).show();
+}
+document.getElementById('showKofiBtn').addEventListener('click', function() {
+    bootstrap.Modal.getInstance(document.getElementById('supportModal')).hide();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('kofiModal')).show();
+});
+document.getElementById('navKofiBtn').addEventListener('click', function() {
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('kofiModal')).show();
+});
+document.getElementById('alreadyDonated').addEventListener('change', function() {
+    if (this.checked) {
+        localStorage.setItem(CP_DONATED_KEY, 'true');
+        bootstrap.Modal.getInstance(document.getElementById('supportModal')).hide();
+    }
+});
+
 let imageWidth = 0;
 let imageHeight = 0;
 let highlightZone = null; // zone key to isolate in preview, or null for all
@@ -37,11 +60,14 @@ function schedulePreview(fn) {
 }
 
 // --- Preview mode: canvas for raster previews, SVG for circle output ---
+const previewPlaceholder = document.getElementById('previewPlaceholder');
 function showPreviewCanvas() {
+    previewPlaceholder.style.display = 'none';
     previewCanvas.style.display = '';
     outputSvg.style.display = 'none';
 }
 function showPreviewSvg() {
+    previewPlaceholder.style.display = 'none';
     previewCanvas.style.display = 'none';
     outputSvg.style.display = '';
 }
@@ -910,9 +936,8 @@ document.getElementById('resetAdjustmentsBtn').addEventListener('click', () => {
     else renderZonePreview();
 });
 
-imageUpload.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+function loadImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = function(event) {
         const img = new Image();
@@ -932,6 +957,30 @@ imageUpload.addEventListener('change', function(e) {
         img.src = event.target.result;
     };
     reader.readAsDataURL(file);
+}
+
+imageUpload.addEventListener('change', function(e) {
+    loadImageFile(e.target.files[0]);
+});
+
+// --- Drag-and-drop onto preview when no image loaded ---
+const previewEl = document.getElementById('preview');
+previewEl.addEventListener('dragover', function(e) {
+    if (imageWidth > 0) return;
+    e.preventDefault();
+    previewPlaceholder.classList.add('drag-over');
+});
+previewEl.addEventListener('dragleave', function(e) {
+    if (!previewEl.contains(e.relatedTarget)) {
+        previewPlaceholder.classList.remove('drag-over');
+    }
+});
+previewEl.addEventListener('drop', function(e) {
+    previewPlaceholder.classList.remove('drag-over');
+    if (imageWidth > 0) return;
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    loadImageFile(file);
 });
 
 document.getElementById('resetBtn').addEventListener('click', () => {
@@ -1553,4 +1602,5 @@ downloadBtn.addEventListener('click', function() {
     a.download = 'packed-circles.svg';
     a.click();
     URL.revokeObjectURL(url);
+    showSupportModal();
 });
