@@ -54,6 +54,15 @@ body {
   margin-right: 0.4rem;
 }
 
+#appNav {
+  background: #1e1e2e;
+  border-color: #3a3a50 !important;
+}
+
+#appBody {
+  min-height: 0;
+}
+
 .section-label {
   font-size: 0.7rem;
   font-weight: 700;
@@ -72,7 +81,7 @@ body {
 
 @media (min-width: 768px) {
   #sidebar {
-    height: 100vh !important;
+    height: 100% !important;
     width: 320px !important;
     flex: 0 0 320px;
     background-color: #1e1e2e !important;
@@ -88,7 +97,7 @@ body {
 }
 #preview {
   flex: 1;
-  height: 100vh;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -96,11 +105,6 @@ body {
   overflow: auto;
   position: relative;
   flex-direction: column;
-}
-@media (max-width: 767.98px) {
-  #preview {
-    padding-top: 3.5rem;
-  }
 }
 #previewContent {
   flex: 1;
