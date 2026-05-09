@@ -1,0 +1,267 @@
+@use 'variables' as *;
+
+body.landing-page {
+  overflow: auto;
+  display: block;
+  min-height: 100vh;
+  background: $cp-surface;
+}
+
+// ── Header ──────────────────────────────────────────────────────────────────
+
+.lp-header a:hover { text-decoration: none; }
+
+// ── Hero ─────────────────────────────────────────────────────────────────────
+
+.lp-hero {
+  padding: 5rem 0 6rem;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 65% 50%, rgba($cp-accent, 0.1) 0%, transparent 65%);
+    pointer-events: none;
+  }
+
+  h1 {
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .lp-accent { color: $cp-accent; }
+
+  .lead {
+    font-size: 1.15rem;
+    color: var(--bs-secondary-color);
+    max-width: 480px;
+  }
+
+  .lp-snark {
+    font-size: 0.85rem;
+    color: $cp-muted;
+    font-style: italic;
+    max-width: 430px;
+  }
+}
+
+.lp-demo-card {
+  position: relative;
+  background: $cp-surface-alt;
+  border: 1px solid $cp-border;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 340px;
+
+  svg { display: block; }
+}
+
+.lp-demo-zone-label {
+  position: absolute;
+  bottom: 0.75rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba($cp-surface, 0.85);
+  border: 1px solid $cp-border;
+}
+
+// ── Shared section styles ────────────────────────────────────────────────────
+
+.lp-section      { padding: 5rem 0; }
+.lp-section-alt  { padding: 5rem 0; background: $cp-surface-alt; border-top: 1px solid $cp-border; border-bottom: 1px solid $cp-border; }
+
+.lp-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: $cp-accent;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.lp-heading {
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  margin-bottom: 0.75rem;
+}
+
+.lp-sub {
+  color: var(--bs-secondary-color);
+  font-size: 1.05rem;
+  max-width: 580px;
+}
+
+// ── Feature cards ────────────────────────────────────────────────────────────
+
+.lp-feature-card {
+  background: $cp-surface;
+  border: 1px solid $cp-border;
+  border-radius: 10px;
+  padding: 1.5rem;
+  height: 100%;
+  transition: border-color 0.2s, transform 0.15s;
+
+  &:hover {
+    border-color: rgba($cp-accent, 0.45);
+    transform: translateY(-2px);
+  }
+}
+
+.lp-feature-icon {
+  width: 42px;
+  height: 42px;
+  background: rgba($cp-accent, 0.12);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: $cp-accent;
+  margin-bottom: 1rem;
+}
+
+// ── Step list ────────────────────────────────────────────────────────────────
+
+.lp-step-num {
+  width: 32px;
+  height: 32px;
+  background: rgba($cp-accent, 0.12);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: $cp-accent;
+  flex-shrink: 0;
+}
+
+.lp-step-connector {
+  width: 1px;
+  height: 22px;
+  background: $cp-border;
+  margin-left: 15px;
+  margin-top: 3px;
+  margin-bottom: 3px;
+}
+
+// ── Pills ────────────────────────────────────────────────────────────────────
+
+.lp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba($cp-accent, 0.1);
+  border: 1px solid rgba($cp-accent, 0.2);
+  border-radius: 2rem;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.85rem;
+  color: $cp-accent;
+}
+
+// ── CTA banner ───────────────────────────────────────────────────────────────
+
+.lp-cta-banner {
+  background: linear-gradient(135deg, rgba($cp-accent, 0.14) 0%, rgba($cp-accent, 0.04) 100%);
+  border: 1px solid rgba($cp-accent, 0.22);
+  border-radius: 16px;
+  padding: 4rem 2rem;
+
+  h2 {
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+    font-weight: 800;
+  }
+}
+
+.lp-btn-cta {
+  background: $cp-accent;
+  color: #fff;
+  border: none;
+  padding: 0.85rem 2.2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 0.6rem;
+  transition: background 0.2s, transform 0.15s;
+  text-decoration: none;
+  display: inline-block;
+
+  &:hover {
+    background: $cp-accent-hover;
+    color: #fff;
+    transform: translateY(-1px);
+  }
+}
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+
+.lp-footer {
+  border-top: 1px solid $cp-border;
+  color: $cp-muted;
+  font-size: 0.85rem;
+  padding: 2rem 0;
+
+  a { color: $cp-accent; text-decoration: none; &:hover { text-decoration: underline; } }
+}
+
+// ── Privacy page ─────────────────────────────────────────────────────────────
+
+.lp-policy {
+  max-width: 720px;
+
+  h2 { font-size: 1.2rem; font-weight: 700; margin-top: 2rem; margin-bottom: 0.5rem; }
+
+  code {
+    background: $cp-surface-alt;
+    border: 1px solid $cp-border;
+    border-radius: 4px;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.85em;
+    color: $cp-accent;
+  }
+
+  a { color: $cp-accent; }
+}
+
+.lp-consent-btn {
+  background: transparent;
+  color: $cp-accent;
+  border: 1px solid $cp-accent;
+  padding: 0.35rem 1rem;
+  border-radius: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+
+  &:hover { background: rgba($cp-accent, 0.12); }
+}
+
+// ── Scroll animations ────────────────────────────────────────────────────────
+
+.lp-anim {
+  opacity: 0;
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+
+  &.fade-up    { transform: translateY(24px); }
+  &.slide-right { transform: translateX(-24px); }
+  &.slide-left  { transform: translateX(24px); }
+  &.scale-in    { transform: scale(0.95); }
+
+  &.visible { opacity: 1; transform: none; }
+}
+
+.lp-stagger > .lp-anim {
+  @for $i from 1 through 6 {
+    &:nth-child(#{$i}) { transition-delay: #{($i - 1) * 0.1}s; }
+  }
+}

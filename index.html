@@ -1,181 +1,360 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en-AU" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Circle Packer</title>
+    <script src="js/consent.js"></script>
+    <title>Vector Circle Packer — Free circle packing SVG generator</title>
+    <meta name="description" content="Fill any image with tightly packed circles and download clean SVG. Control zones by brightness or colour, set circle sizes, choose per-zone colours. Free, browser-based, no signup.">
+    <meta name="keywords" content="circle packing, vector circles, SVG generator, circle pack art, image to circles, circle pattern generator, free design tool">
+    <meta property="og:title" content="Vector Circle Packer — Free circle packing SVG generator">
+    <meta property="og:description" content="Image in, circles out. Zone-based circle packing with clean SVG output. Free, no signup, runs in your browser.">
+    <meta property="og:type" content="website">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="author" content="Carl Manson">
+    <meta name="robots" content="index, follow">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body class="d-flex">
+<body class="landing-page">
 
-<canvas id="hiddenCanvas" style="display:none;"></canvas>
-
-<!-- Mobile toggle -->
-<button class="d-md-none btn btn-sm btn-light border shadow-sm position-fixed top-0 start-0 m-2"
-        style="z-index:1051;" type="button"
-        data-bs-toggle="offcanvas" data-bs-target="#sidebar" aria-controls="sidebar">&#9776;</button>
-
-<!-- Sidebar -->
-<div id="sidebar" class="offcanvas-md offcanvas-start bg-body border-end"
-     style="--bs-offcanvas-width:320px;" tabindex="-1" aria-labelledby="sidebarLabel">
-
-    <div class="offcanvas-header d-md-none border-bottom py-2">
-        <h6 class="offcanvas-title mb-0" id="sidebarLabel">Circle Packer</h6>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#sidebar"></button>
-    </div>
-
-    <div class="offcanvas-body">
-
-        <!-- Header -->
-        <div class="app-header d-none d-md-flex">
-            <a href="index.html" class="text-reset">
-                <h1 class="app-title"><i class="bi bi-circle-fill app-icon"></i>Circle Packer</h1>
+<!-- Header -->
+<header class="border-bottom py-3 lp-header">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between">
+            <a href="index.html" class="text-decoration-none text-reset">
+                <h1 class="h4 mb-0 fw-bold">
+                    <i class="bi bi-circle-fill me-2" style="color:var(--cp-accent);"></i>Vector Circle Packer
+                </h1>
+            </a>
+            <a href="app.html" class="lp-btn-cta" style="padding:0.45rem 1.2rem; font-size:0.95rem;">
+                Open App <i class="bi bi-arrow-right ms-1"></i>
             </a>
         </div>
-
-        <!-- Step navigation -->
-        <div class="step-nav">
-            <button class="step-btn active" data-step="0"><span class="step-num">1</span>Image</button>
-            <button class="step-btn"        data-step="1"><span class="step-num">2</span>Mode</button>
-            <button class="step-btn"        data-step="2"><span class="step-num">3</span>Zones</button>
-            <button class="step-btn"        data-step="3"><span class="step-num">4</span>Circles</button>
-        </div>
-
-        <!-- Panel 1: Image & Adjustments -->
-        <div class="step-panel" id="panel0">
-            <div class="mb-3">
-                <label class="section-label">Image</label>
-                <input type="file" id="imageUpload" class="form-control form-control-sm" accept="image/png,image/jpeg">
-            </div>
-            <div>
-                <div class="section-label d-flex align-items-center justify-content-between">
-                    <span>Adjustments</span>
-                    <button type="button" id="resetAdjustmentsBtn" class="btn btn-link btn-sm p-0 text-muted" title="Reset adjustments">Reset</button>
-                </div>
-                <div class="compact-row">
-                    <label>Brightness</label>
-                    <input type="range" id="brightness" class="form-range" min="-100" max="100" value="0">
-                    <span class="val" id="brightnessVal">0</span>
-                </div>
-                <div class="compact-row">
-                    <label>Contrast</label>
-                    <input type="range" id="contrast" class="form-range" min="-100" max="100" value="0">
-                    <span class="val" id="contrastVal">0</span>
-                </div>
-                <div class="compact-row">
-                    <label>Gamma</label>
-                    <input type="range" id="gamma" class="form-range" min="0.1" max="3.0" step="0.05" value="1.0">
-                    <span class="val" id="gammaVal">1.00</span>
-                </div>
-                <div class="compact-row">
-                    <label>Blur</label>
-                    <input type="range" id="blur" class="form-range" min="0" max="20" step="0.5" value="0">
-                    <span class="val" id="blurVal">0</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Panel 2: Mode & Zones setup -->
-        <div class="step-panel d-none" id="panel1">
-            <div class="mb-3">
-                <div class="section-label">Zone Mode</div>
-                <div class="btn-group w-100" id="modeToggle" role="group">
-                    <button type="button" class="btn btn-sm btn-primary" id="modeBrightness">Brightness</button>
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="modeHue">Hue</button>
-                </div>
-            </div>
-            <div class="d-flex align-items-center gap-2 mb-2">
-                <span class="section-label mb-0">Number of zones</span>
-                <input type="number" id="numZones" class="form-control form-control-sm" style="width:70px;" value="1" min="1" max="8">
-            </div>
-            <div id="hueResetNote" class="alert alert-warning small py-2 px-2 mb-3 d-none">
-                Changing the zone count resets hue angles to an even distribution. Any custom angles set in step 3 will be lost.
-            </div>
-            <div id="thresholdSection" class="mb-3">
-                <label class="section-label">Threshold <span class="float-end fw-normal" id="thresholdVal">128</span></label>
-                <input type="range" id="threshold" class="form-range" min="0" max="255" value="128">
-                <div class="text-muted small mt-1">Pixels above this luminance are excluded (background).</div>
-            </div>
-            <div id="neutralZoneToggles" class="d-none">
-                <div class="section-label">Neutral zones</div>
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" id="blackZoneToggle">
-                    <label class="form-check-label small" for="blackZoneToggle">Black zone (low luminance)</label>
-                </div>
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" id="whiteZoneToggle">
-                    <label class="form-check-label small" for="whiteZoneToggle">White zone (high luminance)</label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Panel 3: Zone Config -->
-        <div class="step-panel d-none" id="panel2">
-            <!-- Brightness: zone summary strips -->
-            <div id="panel2Brightness">
-                <div id="zoneSummaryContainer"></div>
-            </div>
-            <!-- Hue: colour wheel + neutral zones -->
-            <div id="panel2Hue" class="d-none">
-                <div id="hueWheelContainer"></div>
-                <div id="blackZoneContainer"></div>
-                <div id="whiteZoneContainer"></div>
-            </div>
-            <div id="bgZoneSection" class="mt-3">
-                <div class="form-check mb-1">
-                    <input class="form-check-input" type="checkbox" id="bgZoneEnabled">
-                    <label class="form-check-label small" for="bgZoneEnabled">Background zone (above threshold)</label>
-                </div>
-            </div>
-        </div>
-
-        <!-- Panel 4: Circle Config -->
-        <div class="step-panel d-none" id="panel3">
-            <div class="accordion accordion-flush border rounded" id="zonesAccordion"></div>
-        </div>
-
-        <!-- Step footer -->
-        <div class="step-footer">
-            <button id="resetBtn" class="btn btn-outline-secondary btn-sm" title="Reset All Settings"><i class="bi bi-arrow-counterclockwise"></i></button>
-            <button id="prevBtn" class="btn btn-outline-secondary btn-sm" disabled>← Back</button>
-            <span id="stepLabel" class="text-muted small mx-auto">Step 1 of 4</span>
-            <button id="nextBtn" class="btn btn-primary btn-sm">Next →</button>
-            <!-- Mobile only: Generate/Download visible in sidebar on step 4 -->
-            <button id="generateBtnMobile" class="btn btn-primary btn-sm d-md-none" style="display:none">Generate</button>
-            <button id="downloadBtnMobile" class="btn btn-success btn-sm d-md-none" style="display:none" disabled>↓ SVG</button>
-        </div>
-
-    </div><!-- /offcanvas-body -->
-</div><!-- /sidebar -->
-
-<!-- Preview -->
-<div id="preview">
-    <div id="previewContent">
-        <canvas id="previewCanvas"></canvas>
-        <svg id="outputSvg" xmlns="http://www.w3.org/2000/svg" style="display:none;"></svg>
     </div>
-    <img id="sourceThumb" class="d-none" alt="Source reference" draggable="false"
-         style="position:absolute; top:1rem; left:1rem; width:160px; height:auto; max-height:40vh; object-fit:contain; border-radius:.375rem; border:1px solid var(--bs-border-color); box-shadow:0 .5rem 1rem rgba(0,0,0,.15); background:var(--bs-body-bg); cursor:grab; user-select:none; z-index:10;">
-    <div id="previewFooter" class="d-none p-3 bg-body border-top w-100">
-        <div class="container-fluid">
-            <div class="row align-items-center">
-                <div class="col">
-                    <p id="status" class="text-muted small mb-0" style="min-height:1.2em;"></p>
+</header>
+
+<!-- Hero -->
+<section class="lp-hero">
+    <div class="container">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-5">
+                <h1 class="lp-anim fade-up">Image in.<br><span class="lp-accent">Circles</span> out.</h1>
+                <p class="lead mt-3 lp-anim fade-up" style="animation-delay:0.1s">
+                    A free tool that analyses your image and fills the dark areas with tightly packed circles. Pick your zones, set the sizes, download clean SVG.
+                </p>
+                <div class="d-flex gap-3 mt-4 lp-anim fade-up" style="animation-delay:0.2s">
+                    <a href="app.html" class="lp-btn-cta">
+                        Just take me to the tool <i class="bi bi-arrow-right ms-2"></i>
+                    </a>
                 </div>
-                <div class="col-auto">
-                    <div class="d-flex gap-2">
-                        <button id="generateBtn" class="btn btn-primary">Generate Circles</button>
-                        <button id="downloadBtn" class="btn btn-success" disabled>Download SVG</button>
+                <p class="mt-3 lp-snark lp-anim fade-up" style="animation-delay:0.35s">
+                    If you do generative art or graphic design, you probably already know what circle packing is. I built this page anyway so Google would understand what the site is about. You're welcome.
+                </p>
+            </div>
+            <div class="col-lg-7 lp-anim scale-in" style="animation-delay:0.2s">
+                <div class="lp-demo-card">
+                    <svg id="lp-demo-svg" width="100%" height="100%" viewBox="0 0 560 340" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Circles generated by script below -->
+                    </svg>
+                    <span class="lp-demo-zone-label" style="left:3%">Large</span>
+                    <span class="lp-demo-zone-label" style="left:36%">Medium</span>
+                    <span class="lp-demo-zone-label" style="left:69%">Small</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- The gist -->
+<section class="lp-section-alt">
+    <div class="container">
+        <div class="text-center mb-5 lp-anim fade-up">
+            <span class="lp-label">The gist</span>
+            <h2 class="lp-heading">It does what it says</h2>
+            <p class="lp-sub mx-auto">Upload an image. It gets divided into zones. Each zone fills up with circles, largest first, as tightly as they'll fit. You download a clean SVG. That's it.</p>
+        </div>
+        <div class="row g-4 lp-stagger">
+            <div class="col-md-4 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="lp-feature-icon"><i class="bi bi-circle"></i></div>
+                    <h5 class="fw-bold">Greedy packing</h5>
+                    <p class="text-muted mb-0">Circles are placed largest-first using a distance transform and max-heap. Every gap gets filled as tightly as possible. Sub-pixel refinement squeezes out a bit more.</p>
+                </div>
+            </div>
+            <div class="col-md-4 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="lp-feature-icon"><i class="bi bi-file-earmark-code"></i></div>
+                    <h5 class="fw-bold">Clean SVG output</h5>
+                    <p class="text-muted mb-0">Just circles. No nested groups, no raster cruft. Opens cleanly in Illustrator, Figma, Affinity, Inkscape — whatever you use. Recolour, resize, done.</p>
+                </div>
+            </div>
+            <div class="col-md-4 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="lp-feature-icon"><i class="bi bi-layers"></i></div>
+                    <h5 class="fw-bold">Zone-based control</h5>
+                    <p class="text-muted mb-0">Split your image into up to 8 zones — by brightness or by hue. Configure circle sizes, colours and fill mode independently per zone. Different areas, different vibes.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How it works -->
+<section class="lp-section">
+    <div class="container">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-5 lp-anim slide-right">
+                <span class="lp-label">How it works</span>
+                <h2 class="lp-heading">Four steps.<br>No faff.</h2>
+
+                <div class="mt-4">
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="lp-step-num">1</div>
+                        <div>
+                            <h6 class="fw-bold mb-1">Drop in your image</h6>
+                            <p class="text-muted small mb-0">JPEG or PNG. Adjust brightness, contrast, gamma and blur to prep the source. Hit Reset if you muck it up.</p>
+                        </div>
+                    </div>
+                    <div class="lp-step-connector"></div>
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="lp-step-num">2</div>
+                        <div>
+                            <h6 class="fw-bold mb-1">Pick your mode</h6>
+                            <p class="text-muted small mb-0">Brightness mode splits by luminance — dark areas, mid-tones, highlights. Hue mode splits by colour — reds, blues, greens, whatever your image has.</p>
+                        </div>
+                    </div>
+                    <div class="lp-step-connector"></div>
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="lp-step-num">3</div>
+                        <div>
+                            <h6 class="fw-bold mb-1">Configure zones</h6>
+                            <p class="text-muted small mb-0">Set zone boundaries. In brightness mode you get a live preview showing exactly which areas fall into each zone. Hue mode has a colour wheel with draggable handles.</p>
+                        </div>
+                    </div>
+                    <div class="lp-step-connector"></div>
+                    <div class="d-flex align-items-start gap-3">
+                        <div class="lp-step-num">4</div>
+                        <div>
+                            <h6 class="fw-bold mb-1">Set sizes and generate</h6>
+                            <p class="text-muted small mb-0">Set min and max circle radius per zone. Choose per-circle colour sampling, a flat zone colour, or pick your own. Hit Generate. Download SVG.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7 lp-anim slide-left">
+                <div class="lp-demo-card" id="lp-demo-steps" style="height:380px;">
+                    <svg id="lp-demo-svg-2" width="100%" height="100%" viewBox="0 0 560 380" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Zone modes -->
+<section class="lp-section-alt">
+    <div class="container">
+        <div class="text-center mb-5 lp-anim fade-up">
+            <span class="lp-label">Zone modes</span>
+            <h2 class="lp-heading">Two ways to slice your image</h2>
+            <p class="lp-sub mx-auto">Brightness mode is the workhorse. Hue mode is for when your image has distinct colour areas you want to treat differently.</p>
+        </div>
+        <div class="row g-4 lp-stagger">
+            <div class="col-md-6 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="lp-feature-icon mb-0"><i class="bi bi-circle-half"></i></div>
+                        <h5 class="fw-bold mb-0">Brightness mode</h5>
+                    </div>
+                    <p class="text-muted mb-3">Splits the image by luminance — dark, mid, light. Set a threshold to exclude the background. Good for portraits, logos, anything with clear tonal contrast. Works on pretty much everything.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="lp-pill"><i class="bi bi-sliders me-1"></i>Up to 8 zones</span>
+                        <span class="lp-pill"><i class="bi bi-image me-1"></i>Live preview</span>
+                        <span class="lp-pill"><i class="bi bi-circle me-1"></i>Background zone</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="d-flex align-items-center gap-3 mb-3">
+                        <div class="lp-feature-icon mb-0"><i class="bi bi-palette"></i></div>
+                        <h5 class="fw-bold mb-0">Hue mode</h5>
+                    </div>
+                    <p class="text-muted mb-3">Splits by hue angle on the colour wheel. Drag the handles to carve out exactly which colour range each zone captures. Optional black and white neutral zones for greys. Good for colourful illustrations.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <span class="lp-pill"><i class="bi bi-arrow-repeat me-1"></i>Hue wheel</span>
+                        <span class="lp-pill"><i class="bi bi-brightness-low me-1"></i>Black zone</span>
+                        <span class="lp-pill"><i class="bi bi-brightness-high me-1"></i>White zone</span>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
+</section>
+
+<!-- The fine print -->
+<section class="lp-section">
+    <div class="container">
+        <div class="text-center mb-5 lp-anim fade-up">
+            <span class="lp-label">The fine print</span>
+            <h2 class="lp-heading">No catch. Seriously.</h2>
+        </div>
+        <div class="row g-4 lp-stagger">
+            <div class="col-md-6 col-lg-3 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="lp-feature-icon"><i class="bi bi-currency-dollar"></i></div>
+                    <h6 class="fw-bold">Completely free</h6>
+                    <p class="text-muted small mb-0">No AdWords rubbish. No fake Download buttons that are actually ads. No paywall after three uses. Just a free tool.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="lp-feature-icon"><i class="bi bi-shield-lock"></i></div>
+                    <h6 class="fw-bold">Stays in your browser</h6>
+                    <p class="text-muted small mb-0">Your images are processed locally. They never leave your machine, never touch a server. I don't have them and I don't want them.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="lp-feature-icon"><i class="bi bi-person-x"></i></div>
+                    <h6 class="fw-bold">No account needed</h6>
+                    <p class="text-muted small mb-0">No email address. No password. No profile. No newsletter you didn't ask for. Just the tool.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3 lp-anim fade-up">
+                <div class="lp-feature-card">
+                    <div class="lp-feature-icon"><i class="bi bi-cpu"></i></div>
+                    <h6 class="fw-bold">Runs off the main thread</h6>
+                    <p class="text-muted small mb-0">Circle packing runs in a Web Worker so the UI stays responsive while it grinds away. Big images with lots of zones take a moment — the tab won't freeze on you.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section class="lp-section-alt">
+    <div class="container">
+        <div class="lp-cta-banner text-center lp-anim scale-in">
+            <h2>Right, that's enough reading.</h2>
+            <p class="mt-2 mb-4 lp-sub mx-auto">Go make something. If you like it, share it with your designer mates.</p>
+            <a href="app.html" class="lp-btn-cta">
+                Open Vector Circle Packer <i class="bi bi-arrow-right ms-2"></i>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="lp-footer">
+    <div class="container text-center">
+        <p class="mb-1">&copy; 2026 Carl Manson. All rights reserved.</p>
+        <p class="mb-0" style="font-size:0.8rem;">
+            Made in Australia. Your images never leave your browser. <a href="privacy.html">Privacy policy</a>
+        </p>
+    </div>
+</footer>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="main.js"></script>
+<script>
+// Scroll-triggered animations
+const observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+        }
+    });
+}, { threshold: 0.12 });
+document.querySelectorAll('.lp-anim, .lp-stagger').forEach(function(el) { observer.observe(el); });
+
+// Demo illustrations
+(function() {
+    const ns = 'http://www.w3.org/2000/svg';
+
+    function buildCircles(svg, W, H, zones) {
+        const all = [];
+        for (const z of zones) {
+            const rowH = z.spacing * 0.866;
+            let row = 0;
+            for (let y = z.r + 4; y <= H - z.r - 4; y += rowH, row++) {
+                const xOff = row % 2 === 0 ? 0 : z.spacing * 0.5;
+                const xStart = (z.x0 !== undefined ? z.x0 : 0) + z.r + xOff + 4;
+                const xEnd   = (z.x1 !== undefined ? z.x1 : W) - z.r - 4;
+                for (let x = xStart; x <= xEnd; x += z.spacing) {
+                    if (z.minR !== undefined) {
+                        const dx = x - W / 2, dy = y - H / 2;
+                        const d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < z.minR || d >= z.maxR) continue;
+                    }
+                    const c = document.createElementNS(ns, 'circle');
+                    c.setAttribute('cx', Math.round(x));
+                    c.setAttribute('cy', Math.round(y));
+                    c.setAttribute('r', z.r);
+                    c.setAttribute('fill', z.color);
+                    c.style.cssText = 'opacity:0;transform-box:fill-box;transform-origin:center';
+                    svg.appendChild(c);
+                    all.push(c);
+                }
+            }
+            if (z.divider) {
+                const line = document.createElementNS(ns, 'line');
+                line.setAttribute('x1', z.x1); line.setAttribute('y1', 0);
+                line.setAttribute('x2', z.x1); line.setAttribute('y2', H);
+                line.setAttribute('stroke', 'rgba(58,58,80,0.6)');
+                line.setAttribute('stroke-width', '1');
+                line.setAttribute('stroke-dasharray', '4 4');
+                svg.appendChild(line);
+            }
+        }
+        return all;
+    }
+
+    function animate(circles) {
+        circles.forEach(function(c, i) {
+            c.style.animation = 'lp-circ-in 0.3s ease-out ' + (i * 12) + 'ms both';
+        });
+    }
+
+    function onVisible(el, cb) {
+        var fired = false;
+        new IntersectionObserver(function(entries, obs) {
+            if (entries[0].isIntersecting && !fired) { fired = true; obs.disconnect(); cb(); }
+        }, { threshold: 0.2 }).observe(el);
+    }
+
+    // Hero demo — animate immediately (above fold)
+    (function() {
+        var svg = document.getElementById('lp-demo-svg');
+        if (!svg) return;
+        animate(buildCircles(svg, 560, 340, [
+            { x0:   0, x1: 187, r: 27, spacing: 58, color: 'rgba(109,124,229,0.82)', divider: true },
+            { x0: 187, x1: 373, r: 16, spacing: 36, color: 'rgba(181,126,220,0.82)', divider: true },
+            { x0: 373, x1: 560, r:  9, spacing: 21, color: 'rgba(78,204,163,0.82)',  divider: false },
+        ]));
+    })();
+
+    // How-it-works demo — animate on scroll
+    (function() {
+        var card = document.getElementById('lp-demo-steps');
+        var svg  = document.getElementById('lp-demo-svg-2');
+        if (!card || !svg) return;
+        var circles = buildCircles(svg, 560, 380, [
+            { minR:   0, maxR:  90, r: 26, spacing: 56, color: 'rgba(109,124,229,0.85)' },
+            { minR:  90, maxR: 180, r: 16, spacing: 36, color: 'rgba(181,126,220,0.85)' },
+            { minR: 180, maxR: 265, r:  9, spacing: 21, color: 'rgba(78,204,163,0.85)'  },
+        ]);
+        onVisible(card, function() { animate(circles); });
+    })();
+})();
+</script>
+<style>
+@keyframes lp-circ-in {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+}
+</style>
 </body>
 </html>
