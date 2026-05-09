@@ -24,17 +24,17 @@ npx sass --watch _uncompiled/styles.scss:styles.css
 
 ## How it works
 
-1. **Image** — Upload a PNG or JPEG and adjust brightness, contrast, gamma and blur (Reset restores defaults)
-2. **Mode** — Choose brightness or hue-based zone detection and set the number of zones; hue mode offers optional black and white neutral zones
-3. **Zones** — Fine-tune zone boundaries; in brightness mode you can also enable a background zone
-4. **Circles** — Configure per-zone circle sizes, colours and fill mode, then generate
+1. **Image** — Upload a PNG, JPEG, WebP, AVIF or GIF (or drag one onto the preview area) and adjust brightness, contrast, gamma, saturation and blur. Reset restores defaults.
+2. **Mode** — Choose brightness or hue-based zone detection and set the number of zones. Hue mode offers optional black and white neutral zones.
+3. **Zones** — Fine-tune zone boundaries. In brightness mode you can also enable a background zone.
+4. **Circles** — Configure per-zone circle sizes, colours and fill mode, then hit Generate Circles. Download SVG when happy.
 
 The app binarises pixels into zones, computes a Euclidean distance transform per zone, then packs circles greedily largest-first using a max-heap with sub-pixel centre refinement. Circle packing runs in a Web Worker for responsiveness.
 
 ## Preview
 
-The preview panel shows a live zone map that updates as you adjust settings. On steps 2–4 a small draggable thumbnail of the source image appears in the top-left corner as a reference — grab it and move it anywhere inside the preview if it's in the way. On the Circles step, opening a zone accordion isolates that zone in the preview; only one zone panel is open at a time.
+The preview panel shows a live zone map that updates as you adjust settings. On steps 2–4 a small draggable thumbnail of the source image appears in the top-left corner as a reference. On the Circles step, opening a zone accordion isolates that zone in the preview with a ghost of the adjusted source image shown at low opacity behind it for context.
 
 ## Output
 
-The result is rendered as an SVG. Use the **Download SVG** button to save it.
+The result is rendered as an SVG. Use the **Download SVG** button in the step 4 sidebar panel to save it. A support prompt appears after downloading.

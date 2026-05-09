@@ -58,6 +58,36 @@ body {
   margin-right: 0.4rem;
 }
 
+.help-modal-body {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--bs-body-color);
+}
+.help-modal-body p {
+  margin-bottom: 0.65rem;
+}
+.help-modal-body ul {
+  padding-left: 1.25rem;
+  margin-bottom: 0.65rem;
+}
+.help-modal-body ul li {
+  margin-bottom: 0.3rem;
+}
+
+.help-section-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-accent);
+  margin-bottom: 0.6rem;
+}
+
+.help-divider {
+  border-color: var(--cp-border);
+  margin: 1.25rem 0;
+}
+
 #appNav {
   background: #1e1e2e;
   border-color: #3a3a50 !important;
@@ -150,13 +180,6 @@ body {
   outline: 2px dashed var(--cp-accent);
   outline-offset: -12px;
   border-radius: 8px;
-}
-
-#previewFooter {
-  flex-shrink: 0;
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
 }
 
 #outputSvg,
@@ -549,6 +572,39 @@ body.landing-page {
   background: #5a6acf;
   color: #fff;
   transform: translateY(-1px);
+}
+
+.lp-faq .accordion-item {
+  background: transparent;
+  border-color: #3a3a50;
+}
+.lp-faq .accordion-button {
+  background: transparent;
+  color: var(--bs-body-color);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.lp-faq .accordion-button:not(.collapsed) {
+  color: #6d7ce5;
+  box-shadow: none;
+  background: transparent;
+}
+.lp-faq .accordion-button::after {
+  filter: invert(1) brightness(0.6);
+}
+.lp-faq .accordion-button:focus {
+  box-shadow: none;
+}
+.lp-faq .accordion-body {
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.lp-faq .accordion-body a {
+  color: #6d7ce5;
+  text-decoration: none;
+}
+.lp-faq .accordion-body a:hover {
+  text-decoration: underline;
 }
 
 .lp-footer {

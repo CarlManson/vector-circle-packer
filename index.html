@@ -4,11 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="js/consent.js"></script>
-    <title>Vector Circle Packer — Free circle packing SVG generator</title>
-    <meta name="description" content="Fill any image with tightly packed circles and download clean SVG. Control zones by brightness or colour, set circle sizes, choose per-zone colours. Free, browser-based, no signup.">
-    <meta name="keywords" content="circle packing, vector circles, SVG generator, circle pack art, image to circles, circle pattern generator, free design tool">
-    <meta property="og:title" content="Vector Circle Packer — Free circle packing SVG generator">
-    <meta property="og:description" content="Image in, circles out. Zone-based circle packing with clean SVG output. Free, no signup, runs in your browser.">
+    <title>Vector Circle Packer — Bubble Art, Ishihara & Stippling SVG Generator</title>
+    <meta name="description" content="Turn any image into tightly packed circles and download clean SVG. Create bubble art, Ishihara-style colourblind effects, stippling, petri dish illustrations and more. Free, browser-based, no signup.">
+    <meta name="keywords" content="circle packing, bubble art generator, ishihara effect, colourblind test generator, stippling effect, petri dish illustration, circle mosaic, SVG generator, circle pack art, image to circles, pointillism generator, free design tool">
+    <meta property="og:title" content="Vector Circle Packer — Bubble Art, Ishihara & Stippling SVG Generator">
+    <meta property="og:description" content="Turn any image into tightly packed circles. Create bubble art, Ishihara-style effects, stippling and more. Free, no signup, runs in your browser.">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="author" content="Carl Manson">
@@ -48,7 +48,7 @@
             <div class="col-lg-5">
                 <h1 class="lp-anim fade-up">Image in.<br><span class="lp-accent">Circles</span> out.</h1>
                 <p class="lead mt-3 lp-anim fade-up" style="animation-delay:0.1s">
-                    A free tool that analyses your image and fills the dark areas with tightly packed circles. Pick your zones, set the sizes, download clean SVG.
+                    A free tool that fills your image with tightly packed circles and exports clean SVG. Create bubble art, Ishihara-style colourblind effects, stippling, petri dish illustrations — anything that calls for circles.
                 </p>
                 <div class="d-flex gap-3 mt-4 lp-anim fade-up" style="animation-delay:0.2s">
                     <a href="app.html" class="lp-btn-cta">
@@ -231,6 +231,101 @@
                     <div class="lp-feature-icon"><i class="bi bi-cpu"></i></div>
                     <h6 class="fw-bold">Runs off the main thread</h6>
                     <p class="text-muted small mb-0">Circle packing runs in a Web Worker so the UI stays responsive while it grinds away. Big images with lots of zones take a moment — the tab won't freeze on you.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ -->
+<section class="lp-section">
+    <div class="container">
+        <div class="text-center mb-5 lp-anim fade-up">
+            <span class="lp-label">FAQ</span>
+            <h2 class="lp-heading">Common questions</h2>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="accordion accordion-flush lp-faq lp-anim fade-up" id="faqAccordion">
+
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq1">
+                                How do I make an Ishihara colourblind test effect?
+                            </button>
+                        </h3>
+                        <div id="faq1" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                Upload an image with clear tonal contrast — like a number or letter on a plain background. Use Brightness mode with 2 zones. Set both zones to similar circle sizes so the overall density looks uniform, then choose colours that are difficult to distinguish under colour-vision deficiency (e.g. reds and greens). The result mimics the Ishihara plate style closely.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq2">
+                                Can I create a petri dish or microscopy illustration?
+                            </button>
+                        </h3>
+                        <div id="faq2" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                Yes. Start with an abstract blob-shaped source image — a dark shape on a white background works well. Use Brightness mode with 2–3 zones and vary the circle sizes significantly between zones to suggest different colony sizes. Earthy or bacterial colour palettes (ochres, greens, off-whites) sell the effect. Export SVG and drop into Illustrator or Figma to add a circular mask.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq3">
+                                How do I make a stippling or pointillism effect?
+                            </button>
+                        </h3>
+                        <div id="faq3" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                Use Brightness mode with 3–4 zones. Set small max circle sizes (2–4px) and keep the min close to the max so circles stay uniform in size. Darker zones should get smaller, denser circles; lighter zones can have slightly larger ones with more space between. A high-contrast portrait or ink-style illustration gives the best stippling result.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq4">
+                                How is this different from a halftone effect?
+                            </button>
+                        </h3>
+                        <div id="faq4" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                Halftone uses a regular grid of dots that vary in size to simulate tone — the pattern is uniform and repeating. Circle packing fills space as tightly as possible with no fixed grid, so circles of different sizes nestle into whatever gaps are available. The result is organic and irregular rather than mechanical. If you want a traditional halftone, try <a href="https://halftoner.carlmanson.au/" target="_blank" rel="noopener">Vector Halftoner</a>.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq5">
+                                Can I use the SVG in Illustrator, Figma or Affinity?
+                            </button>
+                        </h3>
+                        <div id="faq5" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                Yes — the output is clean, flat SVG with no embedded rasters, no masks, no nested groups. Just circles. It opens without issue in Illustrator, Figma, Affinity Designer, and Inkscape. You can recolour, rescale, apply effects, or combine it with other artwork without any cleanup.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="accordion-item">
+                        <h3 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faq6">
+                                Does it work on photos or just illustrations?
+                            </button>
+                        </h3>
+                        <div id="faq6" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                Both, though results vary. High-contrast photos — portraits, product shots, strong silhouettes — work well in Brightness mode. Colourful illustrations with distinct colour areas work well in Hue mode. Low-contrast or very busy photos can look muddy; bumping the contrast and gamma sliders in Step 1 usually helps. The blur slider is useful for smoothing out noisy areas that would otherwise produce tiny circles that don't pack well.
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>

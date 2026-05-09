@@ -67,6 +67,30 @@ body {
   }
 }
 
+// Help modal
+.help-modal-body {
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--bs-body-color);
+
+  p { margin-bottom: 0.65rem; }
+  ul { padding-left: 1.25rem; margin-bottom: 0.65rem; li { margin-bottom: 0.3rem; } }
+}
+
+.help-section-heading {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cp-accent);
+  margin-bottom: 0.6rem;
+}
+
+.help-divider {
+  border-color: var(--cp-border);
+  margin: 1.25rem 0;
+}
+
 // App nav (top bar)
 #appNav {
   background: $cp-surface;
