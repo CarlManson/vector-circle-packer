@@ -7,7 +7,6 @@
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
 html, body { width:100%; height:100%; overflow:hidden; background:#0f0f1a; }
-
 #toolbar {
   position:fixed; inset:0 0 auto 0; z-index:10; height:44px;
   display:flex; align-items:center; gap:8px; padding:0 12px;
@@ -22,7 +21,6 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0f0f1a; }
   color:rgba(255,255,255,0.7); cursor:pointer; white-space:nowrap;
 }
 .btn:hover, .btn:active { background:rgba(255,255,255,0.16); }
-
 #artboard {
   position:fixed; top:44px; left:0;
   touch-action:none; cursor:crosshair;
@@ -31,14 +29,12 @@ html, body { width:100%; height:100%; overflow:hidden; background:#0f0f1a; }
 </style>
 </head>
 <body>
-
 <div id="toolbar">
   <span id="hint">Hold to grow · Tap to split</span>
   <button class="btn" id="clearBtn">Clear</button>
   <button class="btn" id="exportBtn">Export SVG</button>
 </div>
-<svg id="artboard"></svg>
-
+<canvas id="artboard"></canvas>
 <script>
 'use strict';
 
@@ -47,42 +43,62 @@ const PALETTE = [
   '#4D96FF','#FF9F1C','#F72585','#00B4D8','#B5E48C',
   '#C77DFF','#FF8C69','#06D6A0','#EF476F','#118AB2'
 ];
-const GROW_SPEED  = 80;   // px per second
-const MAX_RADIUS  = 320;
+const GROW_SPEED  = 80;   // px / second
+const MAX_R       = 320;
 const MIN_SAVE_R  = 5;
 const MIN_SPLIT_R = 8;
 const TAP_MS      = 280;
-const WALL_COLOR  = 'rgba(255,255,255,0.55)';
+const WALL_COLOR  = 'rgba(255,255,255,0.72)';
 const WALL_W      = 1.5;
 const BG          = '#0f0f1a';
+const BOND_DEPTH  = 0.28; // overlap as fraction of smaller radius
 
-const svg = document.getElementById('artboard');
-let W = 0, H = 0;
+const canvas = document.getElementById('artboard');
+const ctx    = canvas.getContext('2d');
+let W = 0, H = 0, dpr = 1;
+
 let bubbles    = [];   // {id, x, y, r, color, bonds:Set<id>}
 let growing    = null; // {x, y, r, color, bonds:Set<id>, startTs, rafId}
 let pendingTap = null; // {id, t}
 let nextId     = 0;
 let colorIdx   = 0;
 
-// ── Resize ────────────────────────────────────────────────
+// ── Canvas setup ──────────────────────────────────────────
 function resize() {
-  W = window.innerWidth;
-  H = window.innerHeight - 44;
-  svg.setAttribute('width',   W);
-  svg.setAttribute('height',  H);
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  dpr = window.devicePixelRatio || 1;
+  W   = window.innerWidth;
+  H   = window.innerHeight - 44;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  canvas.width  = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
   render();
 }
 window.addEventListener('resize', resize);
 resize();
 
-// ── Helpers ───────────────────────────────────────────────
+// ── Geometry ─────────────────────────────────────────────
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const nextColor = () => PALETTE[colorIdx++ % PALETTE.length];
 
-function nextColor() { return PALETTE[colorIdx++ % PALETTE.length]; }
+function hexRgba(hex, a) {
+  return `rgba(${parseInt(hex.slice(1,3),16)},${parseInt(hex.slice(3,5),16)},${parseInt(hex.slice(5,7),16)},${a})`;
+}
 
-// Returns the two endpoints of the contact chord between two overlapping circles.
-// Returns null if circles don't properly intersect.
+function bondDist(r1, r2) {
+  return r1 + r2 - BOND_DEPTH * Math.min(r1, r2);
+}
+
+function snapToBond(mover, fixed) {
+  const dT = bondDist(mover.r, fixed.r);
+  const dx = mover.x - fixed.x, dy = mover.y - fixed.y;
+  const d  = Math.hypot(dx, dy);
+  if (d < 0.01) { mover.x = fixed.x + dT; return; }
+  mover.x = fixed.x + (dx / d) * dT;
+  mover.y = fixed.y + (dy / d) * dT;
+}
+
+// Returns [P1, P2] where two circles intersect, or null if they don't properly cross.
 function chordPoints(b1, b2) {
   const dx = b2.x - b1.x, dy = b2.y - b1.y;
   const d  = Math.hypot(dx, dy);
@@ -90,75 +106,120 @@ function chordPoints(b1, b2) {
   const a  = (b1.r*b1.r - b2.r*b2.r + d*d) / (2*d);
   const h  = Math.sqrt(Math.max(0, b1.r*b1.r - a*a));
   const mx = b1.x + a*dx/d, my = b1.y + a*dy/d;
-  const px = -dy/d,          py =  dx/d;
-  return [
-    { x: mx + h*px, y: my + h*py },
-    { x: mx - h*px, y: my - h*py }
-  ];
+  const px = -dy/d, py = dx/d;
+  return [{ x: mx+h*px, y: my+h*py }, { x: mx-h*px, y: my-h*py }];
 }
 
 function hitBubble(x, y) {
   for (let i = bubbles.length - 1; i >= 0; i--)
-    if (dist({x, y}, bubbles[i]) <= bubbles[i].r) return bubbles[i];
+    if (dist({x,y}, bubbles[i]) <= bubbles[i].r) return bubbles[i];
   return null;
 }
 
-// ── Render ────────────────────────────────────────────────
+// ── Canvas render ─────────────────────────────────────────
+// Each bonded bubble is clipped with evenodd so the arc beyond
+// any contact chord is hidden at draw time — no SVG path math needed.
 function render() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = BG;
+  ctx.fillRect(0, 0, W, H);
+
   const gBubble = growing
-    ? { id:-1, x:growing.x, y:growing.y, r:growing.r, color:growing.color, bonds:growing.bonds }
+    ? {id:-1, x:growing.x, y:growing.y, r:growing.r, color:growing.color, bonds:growing.bonds}
     : null;
   const all = gBubble ? [...bubbles, gBubble] : [...bubbles];
 
-  // Collect unique bonded pairs
+  // Draw each bubble, clipped to exclude bonded neighbours' regions
+  for (const b of all) {
+    ctx.save();
+
+    if (b.bonds.size > 0) {
+      ctx.beginPath();
+      ctx.rect(0, 0, W, H);
+      for (const bid of b.bonds) {
+        const o = all.find(x => x.id === bid);
+        // Only subtract o if circles genuinely intersect (have a chord)
+        if (o && chordPoints(b, o)) ctx.arc(o.x, o.y, o.r, 0, 2*Math.PI);
+      }
+      ctx.clip('evenodd');
+    }
+
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, b.r, 0, 2*Math.PI);
+    ctx.fillStyle   = hexRgba(b.color, 0.45);
+    ctx.fill();
+    ctx.strokeStyle = hexRgba(b.color, 0.9);
+    ctx.lineWidth   = 1.5;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // Draw flat contact walls on top
   const seen = new Set();
-  const wallPairs = [];
+  ctx.strokeStyle = WALL_COLOR;
+  ctx.lineWidth   = WALL_W;
+  ctx.lineCap     = 'round';
   for (const b of all) {
     for (const bid of b.bonds) {
-      const lo = Math.min(b.id, bid), hi = Math.max(b.id, bid);
+      const lo = Math.min(b.id,bid), hi = Math.max(b.id,bid);
       const key = `${lo}|${hi}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      const other = all.find(x => x.id === bid);
-      if (other) wallPairs.push([b, other]);
+      const o  = all.find(x => x.id === bid);
+      const cp = o && chordPoints(b, o);
+      if (!cp) continue;
+      ctx.beginPath();
+      ctx.moveTo(cp[0].x, cp[0].y);
+      ctx.lineTo(cp[1].x, cp[1].y);
+      ctx.stroke();
     }
   }
+}
 
-  const out = [];
-  out.push(`<rect width="${W}" height="${H}" fill="${BG}"/>`);
-
-  for (const b of all)
-    out.push(
-      `<circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.r.toFixed(1)}"` +
-      ` fill="${b.color}" fill-opacity="0.45"` +
-      ` stroke="${b.color}" stroke-width="1.5" stroke-opacity="0.85"/>`
-    );
-
-  for (const [b1, b2] of wallPairs) {
-    const pts = chordPoints(b1, b2);
-    if (!pts) continue;
-    out.push(
-      `<line x1="${pts[0].x.toFixed(1)}" y1="${pts[0].y.toFixed(1)}"` +
-      ` x2="${pts[1].x.toFixed(1)}" y2="${pts[1].y.toFixed(1)}"` +
-      ` stroke="${WALL_COLOR}" stroke-width="${WALL_W}" stroke-linecap="round"/>`
-    );
+// ── Physics ───────────────────────────────────────────────
+// Spring relaxation: after any structural change, push/pull all
+// bonded pairs to their target distance so the effect ripples outward.
+function propagate() {
+  for (let iter = 0; iter < 80; iter++) {
+    let maxErr = 0;
+    for (const b of bubbles) {
+      for (const bid of b.bonds) {
+        if (bid <= b.id) continue;
+        const o = bubbles.find(x => x.id === bid);
+        if (!o) continue;
+        const dx = o.x - b.x, dy = o.y - b.y;
+        const d  = Math.hypot(dx, dy);
+        if (d < 0.01) continue;
+        const err = d - bondDist(b.r, o.r);
+        if (Math.abs(err) < 0.3) continue;
+        const f = err * 0.5 / d;
+        b.x += dx*f; b.y += dy*f;
+        o.x -= dx*f; o.y -= dy*f;
+        maxErr = Math.max(maxErr, Math.abs(err));
+      }
+    }
+    if (maxErr < 0.3) break;
   }
-
-  svg.innerHTML = out.join('');
 }
 
 // ── Grow ──────────────────────────────────────────────────
 function startGrowing(x, y) {
   if (growing) stopGrowing(false);
-  growing = { x, y, r: 2, color: nextColor(), bonds: new Set(), startTs: null, rafId: null };
+  growing = {x, y, r:2, color:nextColor(), bonds:new Set(), startTs:null, rafId:null};
   growing.rafId = requestAnimationFrame(growFrame);
 }
 
 function growFrame(ts) {
   if (!growing.startTs) growing.startTs = ts;
-  growing.r = Math.min(MAX_RADIUS, 2 + GROW_SPEED * (ts - growing.startTs) / 1000);
-  for (const b of bubbles)
-    if (dist(growing, b) < growing.r + b.r) growing.bonds.add(b.id);
+  growing.r = Math.min(MAX_R, 2 + GROW_SPEED * (ts - growing.startTs) / 1000);
+  for (const b of bubbles) {
+    if (!growing.bonds.has(b.id) && dist(growing, b) < growing.r + b.r) {
+      growing.bonds.add(b.id);
+      snapToBond(growing, b);
+    }
+  }
   render();
   growing.rafId = requestAnimationFrame(growFrame);
 }
@@ -167,15 +228,13 @@ function stopGrowing(save) {
   if (!growing) return;
   cancelAnimationFrame(growing.rafId);
   if (save && growing.r >= MIN_SAVE_R) {
-    const b = {
-      id: nextId++, x: growing.x, y: growing.y,
-      r: growing.r, color: growing.color, bonds: new Set(growing.bonds)
-    };
-    bubbles.push(b);
-    for (const bid of b.bonds) {
-      const other = bubbles.find(x => x.id === bid);
-      if (other) other.bonds.add(b.id);
+    const nb = {id:nextId++, x:growing.x, y:growing.y, r:growing.r, color:growing.color, bonds:new Set(growing.bonds)};
+    bubbles.push(nb);
+    for (const bid of nb.bonds) {
+      const o = bubbles.find(x => x.id === bid);
+      if (o) o.bonds.add(nb.id);
     }
+    propagate();
   }
   growing = null;
   render();
@@ -188,16 +247,15 @@ function splitBubble(id) {
   const orig = bubbles[idx];
   if (orig.r < MIN_SPLIT_R) return;
 
-  const newR  = orig.r / Math.SQRT2;
-  const angle = Math.random() * Math.PI * 2;
-  const cx = Math.cos(angle), cy = Math.sin(angle);
+  const newR   = orig.r / Math.SQRT2;
+  const offset = bondDist(newR, newR) / 2;
+  const angle  = Math.random() * Math.PI * 2;
 
-  const b1 = { id:nextId++, x:orig.x + newR*cx, y:orig.y + newR*cy, r:newR, color:nextColor(), bonds:new Set() };
-  const b2 = { id:nextId++, x:orig.x - newR*cx, y:orig.y - newR*cy, r:newR, color:nextColor(), bonds:new Set() };
+  const b1 = {id:nextId++, x:orig.x + offset*Math.cos(angle), y:orig.y + offset*Math.sin(angle), r:newR, color:nextColor(), bonds:new Set()};
+  const b2 = {id:nextId++, x:orig.x - offset*Math.cos(angle), y:orig.y - offset*Math.sin(angle), r:newR, color:nextColor(), bonds:new Set()};
   b1.bonds.add(b2.id);
   b2.bonds.add(b1.id);
 
-  // Re-attach original's bonds to the nearer child
   for (const bid of orig.bonds) {
     const other = bubbles.find(x => x.id === bid);
     if (!other) continue;
@@ -208,17 +266,125 @@ function splitBubble(id) {
   }
 
   bubbles.splice(idx, 1, b1, b2);
+  propagate();
   render();
 }
 
-// ── Export ────────────────────────────────────────────────
+// ── SVG export ────────────────────────────────────────────
+// Built from scratch on demand. Each bonded bubble is rendered as
+// a proper arc-path clipped at every chord using SVG path commands.
+// Computed here (not live) so we never slow down the interaction.
+
+const fmtN = v => +v.toFixed(2); // numeric, drops trailing zeros
+
+function svgBubblePath(b, all) {
+  // Collect chord-intersection points on b's circumference
+  const pts = [];
+  for (const bid of b.bonds) {
+    const o  = all.find(x => x.id === bid);
+    const cp = o && chordPoints(b, o);
+    if (!cp) continue;
+    pts.push({angle: Math.atan2(cp[0].y - b.y, cp[0].x - b.x), x: cp[0].x, y: cp[0].y});
+    pts.push({angle: Math.atan2(cp[1].y - b.y, cp[1].x - b.x), x: cp[1].x, y: cp[1].y});
+  }
+
+  if (!pts.length) {
+    // Full circle via two semicircles (SVG arc can't close on itself in one command)
+    const [rx, lx, cy, r] = [b.x+b.r, b.x-b.r, b.y, b.r].map(fmtN);
+    return `M ${rx} ${cy} A ${r} ${r} 0 1 1 ${lx} ${cy} A ${r} ${r} 0 1 1 ${rx} ${cy}`;
+  }
+
+  pts.sort((a, b) => a.angle - b.angle);
+  const n = pts.length;
+  const r = fmtN(b.r);
+
+  // Is the arc from pts[i] → pts[(i+1)%n] (clockwise, sweep=1) outside all bonded bubbles?
+  function isVis(i) {
+    const a1 = pts[i].angle;
+    let   a2 = pts[(i+1)%n].angle;
+    if (a2 <= a1) a2 += 2*Math.PI;
+    const ma = (a1+a2)/2;
+    const mx = b.x + b.r*Math.cos(ma), my = b.y + b.r*Math.sin(ma);
+    return ![...b.bonds].some(bid => {
+      const o = all.find(x => x.id === bid);
+      return o && Math.hypot(mx-o.x, my-o.y) < o.r;
+    });
+  }
+
+  // Start from the first visible arc
+  let si = -1;
+  for (let i = 0; i < n; i++) { if (isVis(i)) { si = i; break; } }
+  if (si < 0) return '';
+
+  const d = [`M ${fmtN(pts[si].x)} ${fmtN(pts[si].y)}`];
+  let i = si;
+  do {
+    if (isVis(i)) {
+      const ni = (i+1)%n;
+      const a1 = pts[i].angle;
+      let   a2 = pts[ni].angle;
+      if (a2 <= a1) a2 += 2*Math.PI;
+      const la = (a2-a1) > Math.PI ? 1 : 0;
+      d.push(`A ${r} ${r} 0 ${la} 1 ${fmtN(pts[ni].x)} ${fmtN(pts[ni].y)}`);
+      i = ni;
+    } else {
+      // Jump over the hidden arc with a straight chord line
+      let ni = (i+1)%n, guard = 0;
+      while (!isVis(ni) && ni !== si && guard++ < n) ni = (ni+1)%n;
+      d.push(`L ${fmtN(pts[ni].x)} ${fmtN(pts[ni].y)}`);
+      i = ni;
+    }
+  } while (i !== si);
+
+  d.push('Z');
+  return d.join(' ');
+}
+
+function buildSVG() {
+  const seen = new Set();
+  const wallPairs = [];
+  for (const b of bubbles) {
+    for (const bid of b.bonds) {
+      const lo = Math.min(b.id,bid), hi = Math.max(b.id,bid);
+      const key = `${lo}|${hi}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const o = bubbles.find(x => x.id === bid);
+      if (o) wallPairs.push([b, o]);
+    }
+  }
+
+  const lines = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`,
+    `<rect width="${W}" height="${H}" fill="${BG}"/>`,
+  ];
+
+  for (const b of bubbles) {
+    const fa = `fill="${b.color}" fill-opacity="0.45"`;
+    const sa = `stroke="${b.color}" stroke-width="1.5" stroke-opacity="0.9"`;
+    if (b.bonds.size > 0) {
+      const dp = svgBubblePath(b, bubbles);
+      if (dp) lines.push(`<path d="${dp}" ${fa} ${sa} stroke-linejoin="round"/>`);
+    } else {
+      lines.push(`<circle cx="${fmtN(b.x)}" cy="${fmtN(b.y)}" r="${fmtN(b.r)}" ${fa} ${sa}/>`);
+    }
+  }
+
+  for (const [b1, b2] of wallPairs) {
+    const cp = chordPoints(b1, b2);
+    if (!cp) continue;
+    lines.push(`<line x1="${fmtN(cp[0].x)}" y1="${fmtN(cp[0].y)}" x2="${fmtN(cp[1].x)}" y2="${fmtN(cp[1].y)}" stroke="${WALL_COLOR}" stroke-width="${WALL_W}" stroke-linecap="round"/>`);
+  }
+
+  lines.push('</svg>');
+  return lines.join('\n');
+}
+
 function exportSVG() {
-  const raw   = svg.outerHTML;
-  const fixed = raw.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
-  const out   = `<?xml version="1.0" encoding="UTF-8"?>\n${fixed}`;
-  const blob  = new Blob([out], { type: 'image/svg+xml' });
-  const url   = URL.createObjectURL(blob);
-  const a     = Object.assign(document.createElement('a'), { href:url, download:'bubbles.svg' });
+  const blob = new Blob([buildSVG()], {type:'image/svg+xml'});
+  const url  = URL.createObjectURL(blob);
+  const a    = Object.assign(document.createElement('a'), {href:url, download:'bubbles.svg'});
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -226,24 +392,21 @@ function exportSVG() {
 }
 
 // ── Pointer events ────────────────────────────────────────
-function svgPoint(e) {
-  const r = svg.getBoundingClientRect();
-  return { x: e.clientX - r.left, y: e.clientY - r.top };
+function canvasPoint(e) {
+  const r = canvas.getBoundingClientRect();
+  return {x: e.clientX - r.left, y: e.clientY - r.top};
 }
 
-svg.addEventListener('pointerdown', e => {
+canvas.addEventListener('pointerdown', e => {
   e.preventDefault();
-  svg.setPointerCapture(e.pointerId);
-  const { x, y } = svgPoint(e);
-  const hit = hitBubble(x, y);
-  if (hit) {
-    pendingTap = { id: hit.id, t: Date.now() };
-  } else {
-    startGrowing(x, y);
-  }
+  canvas.setPointerCapture(e.pointerId);
+  const {x,y} = canvasPoint(e);
+  const hit   = hitBubble(x, y);
+  if (hit) { pendingTap = {id:hit.id, t:Date.now()}; }
+  else      { startGrowing(x, y); }
 });
 
-svg.addEventListener('pointerup', e => {
+canvas.addEventListener('pointerup', e => {
   e.preventDefault();
   if (pendingTap) {
     if (Date.now() - pendingTap.t < TAP_MS) splitBubble(pendingTap.id);
@@ -252,7 +415,7 @@ svg.addEventListener('pointerup', e => {
   stopGrowing(true);
 });
 
-svg.addEventListener('pointercancel', () => {
+canvas.addEventListener('pointercancel', () => {
   pendingTap = null;
   stopGrowing(false);
 });
