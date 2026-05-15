@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Bubble Packer</title>
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:#0f0f1a; }
+
+#toolbar {
+  position:fixed; inset:0 0 auto 0; z-index:10; height:44px;
+  display:flex; align-items:center; gap:8px; padding:0 12px;
+  background:rgba(15,15,26,0.92); backdrop-filter:blur(8px);
+  border-bottom:1px solid rgba(255,255,255,0.07);
+  font-family:system-ui,-apple-system,sans-serif;
+}
+#hint { flex:1; font-size:0.75rem; color:rgba(255,255,255,0.35); }
+.btn {
+  font-size:0.75rem; padding:5px 13px; border-radius:5px;
+  border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.07);
+  color:rgba(255,255,255,0.7); cursor:pointer; white-space:nowrap;
+}
+.btn:hover, .btn:active { background:rgba(255,255,255,0.16); }
+
+#artboard {
+  position:fixed; top:44px; left:0;
+  touch-action:none; cursor:crosshair;
+  user-select:none; -webkit-user-select:none;
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span id="hint">Hold to grow · Tap to split</span>
+  <button class="btn" id="clearBtn">Clear</button>
+  <button class="btn" id="exportBtn">Export SVG</button>
+</div>
+<svg id="artboard"></svg>
+
+<script>
+'use strict';
+
+const PALETTE = [
+  '#FF6B6B','#4ECDC4','#FFD93D','#A78BFA','#6BCB77',
+  '#4D96FF','#FF9F1C','#F72585','#00B4D8','#B5E48C',
+  '#C77DFF','#FF8C69','#06D6A0','#EF476F','#118AB2'
+];
+const GROW_SPEED  = 80;   // px per second
+const MAX_RADIUS  = 320;
+const MIN_SAVE_R  = 5;
+const MIN_SPLIT_R = 8;
+const TAP_MS      = 280;
+const WALL_COLOR  = 'rgba(255,255,255,0.55)';
+const WALL_W      = 1.5;
+const BG          = '#0f0f1a';
+
+const svg = document.getElementById('artboard');
+let W = 0, H = 0;
+let bubbles    = [];   // {id, x, y, r, color, bonds:Set<id>}
+let growing    = null; // {x, y, r, color, bonds:Set<id>, startTs, rafId}
+let pendingTap = null; // {id, t}
+let nextId     = 0;
+let colorIdx   = 0;
+
+// ── Resize ────────────────────────────────────────────────
+function resize() {
+  W = window.innerWidth;
+  H = window.innerHeight - 44;
+  svg.setAttribute('width',   W);
+  svg.setAttribute('height',  H);
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  render();
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ── Helpers ───────────────────────────────────────────────
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+function nextColor() { return PALETTE[colorIdx++ % PALETTE.length]; }
+
+// Returns the two endpoints of the contact chord between two overlapping circles.
+// Returns null if circles don't properly intersect.
+function chordPoints(b1, b2) {
+  const dx = b2.x - b1.x, dy = b2.y - b1.y;
+  const d  = Math.hypot(dx, dy);
+  if (d === 0 || d >= b1.r + b2.r || d <= Math.abs(b1.r - b2.r)) return null;
+  const a  = (b1.r*b1.r - b2.r*b2.r + d*d) / (2*d);
+  const h  = Math.sqrt(Math.max(0, b1.r*b1.r - a*a));
+  const mx = b1.x + a*dx/d, my = b1.y + a*dy/d;
+  const px = -dy/d,          py =  dx/d;
+  return [
+    { x: mx + h*px, y: my + h*py },
+    { x: mx - h*px, y: my - h*py }
+  ];
+}
+
+function hitBubble(x, y) {
+  for (let i = bubbles.length - 1; i >= 0; i--)
+    if (dist({x, y}, bubbles[i]) <= bubbles[i].r) return bubbles[i];
+  return null;
+}
+
+// ── Render ────────────────────────────────────────────────
+function render() {
+  const gBubble = growing
+    ? { id:-1, x:growing.x, y:growing.y, r:growing.r, color:growing.color, bonds:growing.bonds }
+    : null;
+  const all = gBubble ? [...bubbles, gBubble] : [...bubbles];
+
+  // Collect unique bonded pairs
+  const seen = new Set();
+  const wallPairs = [];
+  for (const b of all) {
+    for (const bid of b.bonds) {
+      const lo = Math.min(b.id, bid), hi = Math.max(b.id, bid);
+      const key = `${lo}|${hi}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const other = all.find(x => x.id === bid);
+      if (other) wallPairs.push([b, other]);
+    }
+  }
+
+  const out = [];
+  out.push(`<rect width="${W}" height="${H}" fill="${BG}"/>`);
+
+  for (const b of all)
+    out.push(
+      `<circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.r.toFixed(1)}"` +
+      ` fill="${b.color}" fill-opacity="0.45"` +
+      ` stroke="${b.color}" stroke-width="1.5" stroke-opacity="0.85"/>`
+    );
+
+  for (const [b1, b2] of wallPairs) {
+    const pts = chordPoints(b1, b2);
+    if (!pts) continue;
+    out.push(
+      `<line x1="${pts[0].x.toFixed(1)}" y1="${pts[0].y.toFixed(1)}"` +
+      ` x2="${pts[1].x.toFixed(1)}" y2="${pts[1].y.toFixed(1)}"` +
+      ` stroke="${WALL_COLOR}" stroke-width="${WALL_W}" stroke-linecap="round"/>`
+    );
+  }
+
+  svg.innerHTML = out.join('');
+}
+
+// ── Grow ──────────────────────────────────────────────────
+function startGrowing(x, y) {
+  if (growing) stopGrowing(false);
+  growing = { x, y, r: 2, color: nextColor(), bonds: new Set(), startTs: null, rafId: null };
+  growing.rafId = requestAnimationFrame(growFrame);
+}
+
+function growFrame(ts) {
+  if (!growing.startTs) growing.startTs = ts;
+  growing.r = Math.min(MAX_RADIUS, 2 + GROW_SPEED * (ts - growing.startTs) / 1000);
+  for (const b of bubbles)
+    if (dist(growing, b) < growing.r + b.r) growing.bonds.add(b.id);
+  render();
+  growing.rafId = requestAnimationFrame(growFrame);
+}
+
+function stopGrowing(save) {
+  if (!growing) return;
+  cancelAnimationFrame(growing.rafId);
+  if (save && growing.r >= MIN_SAVE_R) {
+    const b = {
+      id: nextId++, x: growing.x, y: growing.y,
+      r: growing.r, color: growing.color, bonds: new Set(growing.bonds)
+    };
+    bubbles.push(b);
+    for (const bid of b.bonds) {
+      const other = bubbles.find(x => x.id === bid);
+      if (other) other.bonds.add(b.id);
+    }
+  }
+  growing = null;
+  render();
+}
+
+// ── Split ─────────────────────────────────────────────────
+function splitBubble(id) {
+  const idx = bubbles.findIndex(b => b.id === id);
+  if (idx === -1) return;
+  const orig = bubbles[idx];
+  if (orig.r < MIN_SPLIT_R) return;
+
+  const newR  = orig.r / Math.SQRT2;
+  const angle = Math.random() * Math.PI * 2;
+  const cx = Math.cos(angle), cy = Math.sin(angle);
+
+  const b1 = { id:nextId++, x:orig.x + newR*cx, y:orig.y + newR*cy, r:newR, color:nextColor(), bonds:new Set() };
+  const b2 = { id:nextId++, x:orig.x - newR*cx, y:orig.y - newR*cy, r:newR, color:nextColor(), bonds:new Set() };
+  b1.bonds.add(b2.id);
+  b2.bonds.add(b1.id);
+
+  // Re-attach original's bonds to the nearer child
+  for (const bid of orig.bonds) {
+    const other = bubbles.find(x => x.id === bid);
+    if (!other) continue;
+    other.bonds.delete(id);
+    const near = dist(b1, other) <= dist(b2, other) ? b1 : b2;
+    near.bonds.add(other.id);
+    other.bonds.add(near.id);
+  }
+
+  bubbles.splice(idx, 1, b1, b2);
+  render();
+}
+
+// ── Export ────────────────────────────────────────────────
+function exportSVG() {
+  const raw   = svg.outerHTML;
+  const fixed = raw.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  const out   = `<?xml version="1.0" encoding="UTF-8"?>\n${fixed}`;
+  const blob  = new Blob([out], { type: 'image/svg+xml' });
+  const url   = URL.createObjectURL(blob);
+  const a     = Object.assign(document.createElement('a'), { href:url, download:'bubbles.svg' });
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+// ── Pointer events ────────────────────────────────────────
+function svgPoint(e) {
+  const r = svg.getBoundingClientRect();
+  return { x: e.clientX - r.left, y: e.clientY - r.top };
+}
+
+svg.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  svg.setPointerCapture(e.pointerId);
+  const { x, y } = svgPoint(e);
+  const hit = hitBubble(x, y);
+  if (hit) {
+    pendingTap = { id: hit.id, t: Date.now() };
+  } else {
+    startGrowing(x, y);
+  }
+});
+
+svg.addEventListener('pointerup', e => {
+  e.preventDefault();
+  if (pendingTap) {
+    if (Date.now() - pendingTap.t < TAP_MS) splitBubble(pendingTap.id);
+    pendingTap = null;
+  }
+  stopGrowing(true);
+});
+
+svg.addEventListener('pointercancel', () => {
+  pendingTap = null;
+  stopGrowing(false);
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+  bubbles = []; colorIdx = 0;
+  if (growing) stopGrowing(false);
+  render();
+});
+document.getElementById('exportBtn').addEventListener('click', exportSVG);
+</script>
+</body>
+</html>
