@@ -47,24 +47,25 @@ const PALETTE = [
   '#4D96FF','#FF9F1C','#F72585','#00B4D8','#B5E48C',
   '#C77DFF','#FF8C69','#06D6A0','#EF476F','#118AB2'
 ];
-const GROW_SPEED  = 80;   // px per second
+const GROW_SPEED  = 80;
 const MAX_RADIUS  = 320;
 const MIN_SAVE_R  = 5;
 const MIN_SPLIT_R = 8;
 const TAP_MS      = 280;
-const WALL_COLOR  = 'rgba(255,255,255,0.55)';
+const WALL_COLOR  = 'rgba(255,255,255,0.65)';
 const WALL_W      = 1.5;
 const BG          = '#0f0f1a';
+// Overlap as a fraction of the smaller radius — controls how deep bubbles merge
+const BOND_DEPTH  = 0.30;
 
 const svg = document.getElementById('artboard');
 let W = 0, H = 0;
-let bubbles    = [];   // {id, x, y, r, color, bonds:Set<id>}
-let growing    = null; // {x, y, r, color, bonds:Set<id>, startTs, rafId}
-let pendingTap = null; // {id, t}
+let bubbles    = [];
+let growing    = null;
+let pendingTap = null;
 let nextId     = 0;
 let colorIdx   = 0;
 
-// ── Resize ────────────────────────────────────────────────
 function resize() {
   W = window.innerWidth;
   H = window.innerHeight - 44;
@@ -76,13 +77,46 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// ── Helpers ───────────────────────────────────────────────
+// ── Geometry ─────────────────────────────────────────────
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 function nextColor() { return PALETTE[colorIdx++ % PALETTE.length]; }
 
-// Returns the two endpoints of the contact chord between two overlapping circles.
-// Returns null if circles don't properly intersect.
+// Target centre-to-centre distance for two bonded circles
+function bondDist(r1, r2) {
+  return r1 + r2 - BOND_DEPTH * Math.min(r1, r2);
+}
+
+// Move `mover` so it sits at the correct bond distance from `fixed`
+function snapToBond(mover, fixed) {
+  const dT = bondDist(mover.r, fixed.r);
+  const dx = mover.x - fixed.x, dy = mover.y - fixed.y;
+  const d  = Math.hypot(dx, dy);
+  if (d < 0.01) { mover.x = fixed.x + dT; return; }
+  mover.x = fixed.x + (dx / d) * dT;
+  mover.y = fixed.y + (dy / d) * dT;
+}
+
+// Iteratively satisfy bond-distance constraints for all of obj's bonds
+function resolveConstraints(obj) {
+  for (let i = 0; i < 16; i++) {
+    let moved = false;
+    for (const bid of obj.bonds) {
+      const b = bubbles.find(x => x.id === bid);
+      if (!b) continue;
+      const d  = dist(obj, b);
+      const dT = bondDist(obj.r, b.r);
+      if (Math.abs(d - dT) < 0.5) continue;
+      const dx = obj.x - b.x, dy = obj.y - b.y;
+      obj.x = b.x + (dx / d) * dT;
+      obj.y = b.y + (dy / d) * dT;
+      moved = true;
+    }
+    if (!moved) break;
+  }
+}
+
+// Chord endpoints where two overlapping circles intersect
 function chordPoints(b1, b2) {
   const dx = b2.x - b1.x, dy = b2.y - b1.y;
   const d  = Math.hypot(dx, dy);
@@ -90,7 +124,7 @@ function chordPoints(b1, b2) {
   const a  = (b1.r*b1.r - b2.r*b2.r + d*d) / (2*d);
   const h  = Math.sqrt(Math.max(0, b1.r*b1.r - a*a));
   const mx = b1.x + a*dx/d, my = b1.y + a*dy/d;
-  const px = -dy/d,          py =  dx/d;
+  const px = -dy/d, py = dx/d;
   return [
     { x: mx + h*px, y: my + h*py },
     { x: mx - h*px, y: my - h*py }
@@ -106,11 +140,11 @@ function hitBubble(x, y) {
 // ── Render ────────────────────────────────────────────────
 function render() {
   const gBubble = growing
-    ? { id:-1, x:growing.x, y:growing.y, r:growing.r, color:growing.color, bonds:growing.bonds }
+    ? { id: -1, x: growing.x, y: growing.y, r: growing.r, color: growing.color, bonds: growing.bonds }
     : null;
   const all = gBubble ? [...bubbles, gBubble] : [...bubbles];
 
-  // Collect unique bonded pairs
+  // Unique bonded pairs for wall rendering
   const seen = new Set();
   const wallPairs = [];
   for (const b of all) {
@@ -125,14 +159,33 @@ function render() {
   }
 
   const out = [];
+
+  // Each bonded bubble gets a mask that blacks-out its bonded partners,
+  // clipping the arc that would extend beyond the contact chord.
+  out.push('<defs>');
+  for (const b of all) {
+    if (b.bonds.size === 0) continue;
+    const mid = b.id < 0 ? 'mg' : 'm' + b.id;
+    out.push(`<mask id="${mid}"><rect width="${W}" height="${H}" fill="white"/>`);
+    for (const bid of b.bonds) {
+      const o = all.find(x => x.id === bid);
+      if (o) out.push(`<circle cx="${o.x.toFixed(1)}" cy="${o.y.toFixed(1)}" r="${o.r.toFixed(1)}" fill="black"/>`);
+    }
+    out.push('</mask>');
+  }
+  out.push('</defs>');
+
   out.push(`<rect width="${W}" height="${H}" fill="${BG}"/>`);
 
-  for (const b of all)
+  for (const b of all) {
+    const mid  = b.id < 0 ? 'mg' : 'm' + b.id;
+    const mask = b.bonds.size > 0 ? ` mask="url(#${mid})"` : '';
     out.push(
       `<circle cx="${b.x.toFixed(1)}" cy="${b.y.toFixed(1)}" r="${b.r.toFixed(1)}"` +
       ` fill="${b.color}" fill-opacity="0.45"` +
-      ` stroke="${b.color}" stroke-width="1.5" stroke-opacity="0.85"/>`
+      ` stroke="${b.color}" stroke-width="1.5" stroke-opacity="0.85"${mask}/>`
     );
+  }
 
   for (const [b1, b2] of wallPairs) {
     const pts = chordPoints(b1, b2);
@@ -157,8 +210,14 @@ function startGrowing(x, y) {
 function growFrame(ts) {
   if (!growing.startTs) growing.startTs = ts;
   growing.r = Math.min(MAX_RADIUS, 2 + GROW_SPEED * (ts - growing.startTs) / 1000);
-  for (const b of bubbles)
-    if (dist(growing, b) < growing.r + b.r) growing.bonds.add(b.id);
+
+  for (const b of bubbles) {
+    if (!growing.bonds.has(b.id) && dist(growing, b) < growing.r + b.r) {
+      growing.bonds.add(b.id);
+      snapToBond(growing, b); // pull to correct overlap distance on first contact
+    }
+  }
+
   render();
   growing.rafId = requestAnimationFrame(growFrame);
 }
@@ -167,14 +226,15 @@ function stopGrowing(save) {
   if (!growing) return;
   cancelAnimationFrame(growing.rafId);
   if (save && growing.r >= MIN_SAVE_R) {
-    const b = {
+    if (growing.bonds.size > 1) resolveConstraints(growing);
+    const nb = {
       id: nextId++, x: growing.x, y: growing.y,
       r: growing.r, color: growing.color, bonds: new Set(growing.bonds)
     };
-    bubbles.push(b);
-    for (const bid of b.bonds) {
+    bubbles.push(nb);
+    for (const bid of nb.bonds) {
       const other = bubbles.find(x => x.id === bid);
-      if (other) other.bonds.add(b.id);
+      if (other) other.bonds.add(nb.id);
     }
   }
   growing = null;
@@ -188,16 +248,17 @@ function splitBubble(id) {
   const orig = bubbles[idx];
   if (orig.r < MIN_SPLIT_R) return;
 
-  const newR  = orig.r / Math.SQRT2;
-  const angle = Math.random() * Math.PI * 2;
+  const newR   = orig.r / Math.SQRT2;
+  // Position children at the correct bond distance from each other
+  const offset = newR * (1 - BOND_DEPTH / 2);
+  const angle  = Math.random() * Math.PI * 2;
   const cx = Math.cos(angle), cy = Math.sin(angle);
 
-  const b1 = { id:nextId++, x:orig.x + newR*cx, y:orig.y + newR*cy, r:newR, color:nextColor(), bonds:new Set() };
-  const b2 = { id:nextId++, x:orig.x - newR*cx, y:orig.y - newR*cy, r:newR, color:nextColor(), bonds:new Set() };
+  const b1 = { id:nextId++, x:orig.x + offset*cx, y:orig.y + offset*cy, r:newR, color:nextColor(), bonds:new Set() };
+  const b2 = { id:nextId++, x:orig.x - offset*cx, y:orig.y - offset*cy, r:newR, color:nextColor(), bonds:new Set() };
   b1.bonds.add(b2.id);
   b2.bonds.add(b1.id);
 
-  // Re-attach original's bonds to the nearer child
   for (const bid of orig.bonds) {
     const other = bubbles.find(x => x.id === bid);
     if (!other) continue;
